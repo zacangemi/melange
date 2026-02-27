@@ -35,7 +35,7 @@ pub fn border_style() -> Style {
 }
 
 pub fn selected_style() -> Style {
-    Style::default().fg(SPICE_ORANGE).bg(Color::Rgb(40, 35, 25))
+    Style::default().fg(SPICE_ORANGE).bg(Color::Rgb(55, 40, 20)).add_modifier(Modifier::BOLD)
 }
 
 pub fn dim_style() -> Style {

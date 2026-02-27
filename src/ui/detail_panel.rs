@@ -45,43 +45,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     // Available RAM for models (total - OS reserved)
     let avail_gb = (total_ram as f64 / (1024.0 * 1024.0 * 1024.0)) - 3.5;
 
-    // Build KV cache summary from estimates
-    let kv_summary = analysis
-        .estimates
-        .iter()
-        .take(4) // Show first 4 context lengths
-        .map(|e| {
-            let ctx_label = if e.context_length >= 1024 {
-                format!("{}K", e.context_length / 1024)
-            } else {
-                format!("{}", e.context_length)
-            };
-            format!("{}: {:.1} GB", ctx_label, e.kv_cache_gb())
-        })
-        .collect::<Vec<_>>()
-        .join(" │ ");
-
-    // Memory breakdown bars
-    let bar_total = area.width.saturating_sub(24) as f64;
-    let weight_frac = model.size_gb() / avail_gb;
-    let kv_4k_frac = if let Some(e) = analysis.estimates.first() {
-        e.kv_cache_gb() / avail_gb
-    } else {
-        0.0
-    };
-    let overhead_frac = (model.size_gb() * 0.10) / avail_gb;
-
-    let weight_bar = make_bar(bar_total, weight_frac);
-    let kv_bar = make_bar(bar_total, kv_4k_frac);
-    let overhead_bar = make_bar(bar_total, overhead_frac);
-
-    // Total at 4K
-    let total_4k = if let Some(e) = analysis.estimates.first() {
-        e.total_gb()
-    } else {
-        0.0
-    };
-
     // Horizon limit display
     let horizon = if analysis.max_safe_context > 1024 {
         format!("{}K tokens", analysis.max_safe_context / 1024)
@@ -89,57 +52,111 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         format!("{} tokens", analysis.max_safe_context)
     };
 
-    let lines = vec![
-        Line::from(vec![
-            Span::styled(
-                format!("  ▸ {}  (Selected)", model.name),
-                theme::highlight_style(),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!(
-                    "  Spice Flow Rate: ~{:.0}-{:.0} tok/s{}",
-                    analysis.tok_s_low, analysis.tok_s_high, expert_info
-                ),
-                theme::text_style(),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!("  Horizon Limit: {} (max safe context)", horizon),
-                theme::text_style(),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(format!("  KV Cache @ {}", kv_summary), theme::text_style()),
-        ]),
-        Line::from(vec![
-            Span::styled(format!("  [{}]", weight_bar), theme::highlight_style()),
-            Span::styled(format!(" Weights: {:.1}G", model.size_gb()), theme::text_style()),
-        ]),
-        Line::from(vec![
-            Span::styled(format!("  [{}]", kv_bar), theme::safe_style()),
-            Span::styled(
-                format!(
-                    " KV@4K:   {:.1}G",
-                    analysis.estimates.first().map(|e| e.kv_cache_gb()).unwrap_or(0.0)
-                ),
-                theme::text_style(),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(format!("  [{}]", overhead_bar), theme::dim_style()),
-            Span::styled(format!(" Overhead: {:.1}G", model.size_gb() * 0.10), theme::text_style()),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!("  Total @ 4K ctx: {:.1}G / {:.1}G avail ── ", total_4k, avail_gb),
-                theme::text_style(),
-            ),
-            Span::styled(analysis.status.label(), status_style),
-        ]),
-    ];
+    // Memory bar width (leave room for labels)
+    let bar_width = (area.width as usize).saturating_sub(40).min(60).max(20);
+
+    let weight_gb = model.size_gb();
+    let kv_4k_gb = analysis.estimates.first().map(|e| e.kv_cache_gb()).unwrap_or(0.0);
+    let overhead_gb = weight_gb * 0.10;
+
+    let weight_bar = make_labeled_bar(bar_width, weight_gb, avail_gb);
+    let kv_bar = make_labeled_bar(bar_width, kv_4k_gb, avail_gb);
+    let overhead_bar = make_labeled_bar(bar_width, overhead_gb, avail_gb);
+
+    // Total at 4K
+    let total_4k = analysis.estimates.first().map(|e| e.total_gb()).unwrap_or(0.0);
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Title line
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  ▸ {}  (Selected)", model.name),
+            theme::highlight_style(),
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // Key metrics row
+    lines.push(Line::from(vec![
+        Span::styled("  Spice Flow Rate:  ", theme::dim_style()),
+        Span::styled(
+            format!("~{:.0}-{:.0} tok/s", analysis.tok_s_low, analysis.tok_s_high),
+            theme::highlight_style(),
+        ),
+        Span::styled(expert_info, theme::dim_style()),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled("  Horizon Limit:    ", theme::dim_style()),
+        Span::styled(&horizon, theme::highlight_style()),
+        Span::styled("  (max safe context before swap)", theme::dim_style()),
+    ]));
+
+    lines.push(Line::from(""));
+
+    // KV Cache growth table
+    lines.push(Line::from(vec![
+        Span::styled("  KV Cache Growth:", theme::title_style()),
+    ]));
+
+    // Build context length rows
+    for est in analysis.estimates.iter().take(6) {
+        let ctx_label = if est.context_length >= 1024 {
+            format!("{}K", est.context_length / 1024)
+        } else {
+            format!("{}", est.context_length)
+        };
+
+        let est_total = est.total_gb();
+        let fits = est_total <= (total_ram as f64 / (1024.0 * 1024.0 * 1024.0));
+        let (indicator, ind_style) = if fits {
+            ("  OK ", theme::safe_style())
+        } else {
+            (" SWAP", theme::danger_style())
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!("    {:>6} ctx ", ctx_label), theme::dim_style()),
+            Span::styled(format!("KV: {:>6.1} GB", est.kv_cache_gb()), theme::text_style()),
+            Span::styled("  │  ", theme::dim_style()),
+            Span::styled(format!("Total: {:>5.1} GB", est_total), theme::text_style()),
+            Span::styled(indicator, ind_style),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+
+    // Memory breakdown bars
+    lines.push(Line::from(vec![
+        Span::styled("  Memory Breakdown:", theme::title_style()),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(format!("  Weights:  {: >5.1}G  ", weight_gb), theme::text_style()),
+        Span::styled(format!("[{}]", weight_bar), theme::highlight_style()),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(format!("  KV @4K:   {: >5.1}G  ", kv_4k_gb), theme::text_style()),
+        Span::styled(format!("[{}]", kv_bar), theme::safe_style()),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled(format!("  Overhead: {: >5.1}G  ", overhead_gb), theme::text_style()),
+        Span::styled(format!("[{}]", overhead_bar), theme::dim_style()),
+    ]));
+
+    lines.push(Line::from(""));
+
+    // Final verdict
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!("  Total @ 4K ctx: {:.1}G / {:.1}G available  ──  ", total_4k, avail_gb),
+            theme::text_style(),
+        ),
+        Span::styled(analysis.status.label(), status_style),
+    ]));
 
     let title = format!(" ▸ {}  ", model.name);
     let panel = Paragraph::new(lines).block(
@@ -153,8 +170,9 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(panel, area);
 }
 
-fn make_bar(total_width: f64, fraction: f64) -> String {
-    let filled = ((fraction * total_width).round() as usize).max(1);
-    let empty = (total_width as usize).saturating_sub(filled);
+fn make_labeled_bar(width: usize, value_gb: f64, max_gb: f64) -> String {
+    let fraction = (value_gb / max_gb).min(1.0);
+    let filled = ((fraction * width as f64).round() as usize).max(1);
+    let empty = width.saturating_sub(filled);
     format!("{}{}", "█".repeat(filled), "░".repeat(empty))
 }

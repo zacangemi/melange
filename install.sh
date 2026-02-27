@@ -2,7 +2,7 @@
 set -e
 
 REPO="zacangemi/melange"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="$HOME/.melange/bin"
 BINARY="melange"
 
 echo ''
@@ -17,7 +17,8 @@ echo 'M E L A N G E  Installer'
 echo '"The memory must flow..."'
 echo ''
 
-# Check architecture
+# --- Platform checks ---
+
 ARCH=$(uname -m)
 OS=$(uname -s)
 
@@ -33,9 +34,22 @@ if [ "$ARCH" != "arm64" ]; then
     exit 1
 fi
 
-# Get latest release
+# --- Warn about old install ---
+
+if [ -f "/usr/local/bin/melange" ]; then
+    echo "Note: Found old install at /usr/local/bin/melange"
+    echo "      You can remove it with: sudo rm /usr/local/bin/melange"
+    echo ""
+fi
+
+# --- Create install directory ---
+
+mkdir -p "$INSTALL_DIR"
+
+# --- Try pre-built binary, fall back to source ---
+
 echo "Fetching latest release..."
-DOWNLOAD_URL=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"browser_download_url"' | grep 'melange-macos-arm64' | head -1 | cut -d '"' -f 4)
+DOWNLOAD_URL=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"browser_download_url"' | grep 'melange-macos-arm64' | head -1 | cut -d '"' -f 4 || true)
 
 if [ -z "$DOWNLOAD_URL" ]; then
     echo "No pre-built binary found. Building from source..."
@@ -58,8 +72,8 @@ if [ -z "$DOWNLOAD_URL" ]; then
     cargo build --release
 
     echo "Installing to ${INSTALL_DIR}..."
-    sudo cp "target/release/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-    sudo chmod +x "${INSTALL_DIR}/${BINARY}"
+    cp "target/release/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+    chmod +x "${INSTALL_DIR}/${BINARY}"
 
     # Cleanup
     rm -rf "$TMPDIR"
@@ -71,16 +85,73 @@ else
     chmod +x "$TMPFILE"
 
     echo "Installing to ${INSTALL_DIR}..."
-    sudo mv "$TMPFILE" "${INSTALL_DIR}/${BINARY}"
-    sudo chmod +x "${INSTALL_DIR}/${BINARY}"
+    mv "$TMPFILE" "${INSTALL_DIR}/${BINARY}"
+    chmod +x "${INSTALL_DIR}/${BINARY}"
+fi
+
+# --- Update PATH in shell rc file ---
+
+PATH_LINE="export PATH=\"\$HOME/.melange/bin:\$PATH\""
+
+add_to_path() {
+    RC_FILE="$1"
+    if [ -f "$RC_FILE" ]; then
+        if ! grep -qF '.melange/bin' "$RC_FILE"; then
+            echo "" >> "$RC_FILE"
+            echo "# Melange" >> "$RC_FILE"
+            echo "$PATH_LINE" >> "$RC_FILE"
+            echo "  Added to PATH in $RC_FILE"
+            return 0
+        else
+            echo "  PATH already configured in $RC_FILE"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+echo ""
+FOUND_RC=0
+
+# Try shell rc files in order of preference
+if [ -n "$SHELL" ]; then
+    case "$SHELL" in
+        */zsh)
+            add_to_path "$HOME/.zshrc" && FOUND_RC=1
+            ;;
+        */bash)
+            add_to_path "$HOME/.bashrc" && FOUND_RC=1
+            if [ "$FOUND_RC" -eq 0 ]; then
+                add_to_path "$HOME/.bash_profile" && FOUND_RC=1
+            fi
+            ;;
+    esac
+fi
+
+# Fallback: try common rc files
+if [ "$FOUND_RC" -eq 0 ]; then
+    add_to_path "$HOME/.zshrc" && FOUND_RC=1
+fi
+if [ "$FOUND_RC" -eq 0 ]; then
+    add_to_path "$HOME/.bashrc" && FOUND_RC=1
+fi
+if [ "$FOUND_RC" -eq 0 ]; then
+    add_to_path "$HOME/.profile" && FOUND_RC=1
+fi
+if [ "$FOUND_RC" -eq 0 ]; then
+    echo "  Could not find a shell rc file to update."
+    echo "  Add this to your shell profile manually:"
+    echo "    $PATH_LINE"
 fi
 
 echo ""
 echo "Installed successfully!"
 echo ""
-echo "Run it:"
-echo "  melange              # Launch the TUI dashboard"
-echo "  melange --json       # Output as JSON"
-echo "  melange --scan PATH  # Custom model directory"
+echo "  Open a new terminal, then run:"
+echo ""
+echo "    melange              # Launch the TUI dashboard"
+echo "    melange config       # Configure model directory"
+echo "    melange --scan PATH  # Scan a specific directory"
+echo "    melange --json       # Output as JSON"
 echo ""
 echo "The spice must flow."

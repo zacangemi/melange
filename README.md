@@ -1,6 +1,6 @@
 # Melange — "The Memory Must Flow"
 
-A Dune-themed terminal tool that scans your hardware and local model files to tell you exactly what fits, how fast it'll run, and when you'll hit swap — so you never drown a model in memory again.
+A Dune-themed terminal tool that scans your Apple Silicon hardware and local model files to tell you exactly what fits, how fast it'll run, and when you'll hit swap.
 
 ```
     ___
@@ -13,23 +13,25 @@ ___/ o \____
 
 ## Why?
 
-Running LLMs locally on Apple Silicon? Memory is everything. A model that looks perfect on paper can drown in swap at real prompt sizes (we learned this the hard way with GLM-4.7-Flash at 6-bit — 227 tok/s dropped to 5 tok/s).
+Running LLMs locally on Apple Silicon? Memory is everything. A model that looks perfect on paper can drown in swap at real prompt sizes.
 
-**Melange scans your hardware, scans your model files, does the math, and shows you:**
+Melange scans your hardware, reads your model metadata, does the math, and shows you:
 - Will it fit in memory?
 - How fast will it generate tokens?
 - At what context length will it hit swap?
 - KV cache growth at every context size
 
-**No Ollama. No APIs. No cloud.** Pure local: scan hardware, scan model files on disk, do the math, show the results.
+No Ollama. No APIs. No cloud. Pure local analysis.
 
 ## Install
 
-### Quick Install (macOS Apple Silicon)
+### One-liner (macOS Apple Silicon)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/zacangemi/melange/main/install.sh | sh
 ```
+
+This installs to `~/.melange/bin/` and updates your shell PATH. No sudo required.
 
 ### Build from Source
 
@@ -39,20 +41,32 @@ Requires [Rust](https://rustup.rs/):
 git clone https://github.com/zacangemi/melange.git
 cd melange
 cargo build --release
-cp target/release/melange /usr/local/bin/
+cp target/release/melange ~/.melange/bin/
 ```
+
+## First Run
+
+The first time you run `melange`, it will ask where your models live:
+
+```
+  Welcome to Melange — "The memory must flow"
+
+  First-time setup: I need to know where your models live.
+
+  Model directory path: ~/AI_MODELS/models
+
+  Saved to ~/.config/melange/config.toml
+```
+
+Your choice is saved and used for all future runs. If `~/AI_MODELS/models/` already exists on your machine, Melange will detect it automatically and skip the prompt.
 
 ## Usage
 
 ```bash
-# Launch the TUI dashboard
-melange
-
-# Scan a custom model directory
-melange --scan /path/to/models
-
-# Output as JSON (for scripting)
-melange --json
+melange                  # Launch the TUI dashboard
+melange config           # Show or change configuration
+melange --scan /path     # Override model directory for this run
+melange --json           # Output as JSON (for scripting)
 ```
 
 ### Controls
@@ -62,6 +76,25 @@ melange --json
 | `j` / `k` or arrows | Navigate models |
 | `r` | Refresh hardware & models |
 | `q` / `Esc` | Quit |
+
+## Configuration
+
+Config file: `~/.config/melange/config.toml`
+
+```toml
+# Melange configuration
+# Run `melange config` to change these settings
+
+model_dir = "/Users/you/AI_MODELS/models"
+```
+
+Model directory resolution order:
+1. `--scan` flag (highest priority — explicit CLI override)
+2. Config file (`~/.config/melange/config.toml`)
+3. Default `~/AI_MODELS/models/` if it exists (auto-saved to config)
+4. First-run interactive prompt (only if nothing else works)
+
+Run `melange config` at any time to view or change your settings.
 
 ## What It Scans
 
@@ -75,8 +108,6 @@ melange --json
 **Models** (reads JSON metadata only — never touches weight files):
 - `config.json` — architecture, layers, attention heads, MoE experts, quantization
 - `model.safetensors.index.json` — exact parameter count and byte size
-
-**Default model directory:** `~/AI_MODELS/models/`
 
 ## Spice Status
 

@@ -1,4 +1,5 @@
 mod app;
+mod config;
 mod hardware;
 mod models;
 mod ui;
@@ -9,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use crossterm::{
     event::{self, Event, KeyEventKind},
     execute,
@@ -30,13 +31,22 @@ use models::memory_calc;
 #[command(name = "melange", version = "0.1.0")]
 #[command(about = "The memory must flow — local model memory analyzer for Apple Silicon")]
 struct Cli {
-    /// Path to model directory (default: ~/AI_MODELS/models/)
-    #[arg(long = "scan", value_name = "PATH")]
+    /// Path to model directory (overrides config for this run)
+    #[arg(long = "scan", value_name = "PATH", global = true)]
     model_dir: Option<PathBuf>,
 
     /// Output as JSON instead of launching TUI
-    #[arg(long)]
+    #[arg(long, global = true)]
     json: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Show or change Melange configuration
+    Config,
 }
 
 #[derive(Serialize)]
@@ -80,10 +90,12 @@ struct JsonEstimate {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let default_model_dir = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("AI_MODELS/models");
-    let model_dir = cli.model_dir.unwrap_or(default_model_dir);
+    // Handle `melange config` subcommand
+    if let Some(Commands::Config) = cli.command {
+        return config::run_config_command();
+    }
+
+    let model_dir = resolve_model_dir(cli.model_dir)?;
 
     // Detect hardware
     let hardware = HardwareInfo::detect()?;
@@ -104,6 +116,36 @@ fn main() -> Result<()> {
 
     // Launch TUI
     run_tui(hardware, found_models, model_dir)
+}
+
+/// Resolve the model directory with priority:
+/// 1. --scan flag (explicit CLI override)
+/// 2. Config file (~/.config/melange/config.toml)
+/// 3. Default ~/AI_MODELS/models/ if it exists (auto-saves to config)
+/// 4. First-run interactive prompt
+fn resolve_model_dir(cli_override: Option<PathBuf>) -> Result<PathBuf> {
+    // 1. CLI flag takes highest priority
+    if let Some(path) = cli_override {
+        return Ok(path);
+    }
+
+    // 2. Check config file
+    if let Some(cfg) = config::load_config()? {
+        return Ok(PathBuf::from(&cfg.model_dir));
+    }
+
+    // 3. Check if default directory exists (auto-save to config)
+    let default_dir = config::default_model_dir();
+    if default_dir.exists() && default_dir.is_dir() {
+        let cfg = config::MelangeConfig {
+            model_dir: default_dir.to_string_lossy().to_string(),
+        };
+        config::save_config(&cfg)?;
+        return Ok(default_dir);
+    }
+
+    // 4. First-run interactive prompt
+    config::first_run_setup()
 }
 
 fn output_json(hardware: &HardwareInfo, models: &[models::ModelInfo]) -> Result<()> {

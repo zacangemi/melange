@@ -14,3 +14,4 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 bytesize = "1"
 dirs = "5"
+toml = "0.8"

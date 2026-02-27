@@ -52,12 +52,15 @@ fn draw_body(f: &mut Frame, app: &App, area: Rect) {
     memory_panel::draw(f, app, top_row[0]);
     hardware_panel::draw(f, app, top_row[1]);
 
-    // Bottom section: Model list | Detail panel
+    // Bottom section: compact model table + expanded detail panel
+    let model_count = app.models.len() as u16;
+    let table_height = model_count + 3; // rows + header + borders
+
     let bottom = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(5),      // Model table
-            Constraint::Length(10),   // Detail panel
+            Constraint::Length(table_height),  // Model table (compact)
+            Constraint::Min(10),               // Detail panel (fills rest)
         ])
         .split(body[1]);
 
