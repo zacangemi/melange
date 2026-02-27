@@ -32,11 +32,11 @@ use models::memory_calc;
 #[command(about = "The memory must flow — local model memory analyzer for Apple Silicon")]
 struct Cli {
     /// Scan a specific directory (one-time override, not saved)
-    #[arg(long = "scan", value_name = "PATH", global = true)]
+    #[arg(long = "scan", value_name = "PATH")]
     scan: Option<PathBuf>,
 
     /// Output as JSON instead of launching TUI
-    #[arg(long, global = true)]
+    #[arg(long)]
     json: bool,
 
     #[command(subcommand)]
