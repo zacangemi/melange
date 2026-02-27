@@ -1,12 +1,15 @@
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::models;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MelangeConfig {
-    pub model_dir: String,
+    #[serde(default)]
+    pub model_dirs: Vec<String>,
 }
 
 /// Returns `~/.config/melange/config.toml`
@@ -29,6 +32,11 @@ pub fn load_config() -> Result<Option<MelangeConfig>> {
     Ok(Some(cfg))
 }
 
+/// Load config or return empty default.
+pub fn load_config_or_default() -> Result<MelangeConfig> {
+    Ok(load_config()?.unwrap_or(MelangeConfig { model_dirs: vec![] }))
+}
+
 /// Save config to disk, creating parent dirs as needed.
 pub fn save_config(cfg: &MelangeConfig) -> Result<()> {
     let path = config_path()?;
@@ -39,7 +47,9 @@ pub fn save_config(cfg: &MelangeConfig) -> Result<()> {
     let toml_str = toml::to_string_pretty(cfg)
         .context("Failed to serialize config")?;
     let contents = format!(
-        "# Melange configuration\n# Run `melange config` to change these settings\n\n{}",
+        "# Melange configuration\n\
+         # Manage directories with: melange add, melange dirs, melange remove\n\n\
+         {}",
         toml_str
     );
     std::fs::write(&path, contents)
@@ -79,21 +89,21 @@ fn prompt_model_dir(prompt_msg: &str) -> Result<PathBuf> {
         let input = line.trim();
 
         if input.is_empty() {
-            println!("Please enter a path.");
+            println!("  Please enter a path.");
             continue;
         }
 
         let path = expand_tilde(input);
 
         if !path.exists() {
-            println!("Directory does not exist: {}", path.display());
-            println!("Please enter a valid path.\n");
+            println!("  Directory does not exist: {}", path.display());
+            println!("  Please enter a valid path.\n");
             continue;
         }
 
         if !path.is_dir() {
-            println!("Not a directory: {}", path.display());
-            println!("Please enter a valid directory path.\n");
+            println!("  Not a directory: {}", path.display());
+            println!("  Please enter a valid directory path.\n");
             continue;
         }
 
@@ -101,8 +111,30 @@ fn prompt_model_dir(prompt_msg: &str) -> Result<PathBuf> {
     }
 }
 
-/// First-run interactive setup. Asks for model dir, saves config, returns the path.
-pub fn first_run_setup() -> Result<PathBuf> {
+/// Scan a directory and print what was found.
+fn scan_and_report(path: &Path) -> usize {
+    match models::scanner::scan_directory(path) {
+        Ok(found) => {
+            if found.is_empty() {
+                println!("  No models found in {}", path.display());
+                println!("  (Added anyway — models can be downloaded later.)");
+            } else {
+                println!("  Found {} model{}:", found.len(), if found.len() == 1 { "" } else { "s" });
+                for m in &found {
+                    println!("    {} ({:.1}B params, {}-bit)", m.name, m.params_billions(), m.quant_bits);
+                }
+            }
+            found.len()
+        }
+        Err(_) => {
+            println!("  Could not scan {} (added anyway)", path.display());
+            0
+        }
+    }
+}
+
+/// First-run interactive setup. Asks for model dir, saves config, returns the paths.
+pub fn first_run_setup() -> Result<Vec<PathBuf>> {
     println!();
     println!("  Welcome to Melange — \"The memory must flow\"");
     println!();
@@ -112,58 +144,137 @@ pub fn first_run_setup() -> Result<PathBuf> {
     println!();
 
     let model_dir = prompt_model_dir("  Model directory path: ")?;
+    println!();
+    scan_and_report(&model_dir);
 
     let cfg = MelangeConfig {
-        model_dir: model_dir.to_string_lossy().to_string(),
+        model_dirs: vec![model_dir.to_string_lossy().to_string()],
     };
     save_config(&cfg)?;
 
     println!();
     println!("  Saved to {}", config_path()?.display());
-    println!("  You can change this later with `melange config`.");
+    println!("  Add more directories later with `melange add /path`.");
     println!();
 
-    Ok(model_dir)
+    Ok(vec![model_dir])
+}
+
+/// `melange add /path` — register a new model directory.
+pub fn run_add_command(path_str: &str) -> Result<()> {
+    let path = expand_tilde(path_str);
+
+    if !path.exists() || !path.is_dir() {
+        anyhow::bail!("Not a valid directory: {}", path.display());
+    }
+
+    let canonical = path.canonicalize()
+        .unwrap_or_else(|_| path.clone());
+
+    let mut cfg = load_config_or_default()?;
+
+    // Check for duplicates
+    for existing in &cfg.model_dirs {
+        let existing_canonical = PathBuf::from(existing).canonicalize()
+            .unwrap_or_else(|_| PathBuf::from(existing));
+        if existing_canonical == canonical {
+            println!();
+            println!("  Already registered: {}", path.display());
+            println!();
+            return Ok(());
+        }
+    }
+
+    println!();
+    println!("  Scanning {}...", path.display());
+    println!();
+    scan_and_report(&path);
+
+    cfg.model_dirs.push(canonical.to_string_lossy().to_string());
+    save_config(&cfg)?;
+
+    println!();
+    println!("  Directory added. ({} total)", cfg.model_dirs.len());
+    println!();
+    Ok(())
+}
+
+/// `melange dirs` — list registered model directories.
+pub fn run_dirs_command() -> Result<()> {
+    let cfg = load_config_or_default()?;
+
+    println!();
+    if cfg.model_dirs.is_empty() {
+        println!("  No model directories registered.");
+        println!("  Add one with: melange add /path/to/models");
+    } else {
+        println!("  Registered model directories:");
+        println!();
+        for (i, dir) in cfg.model_dirs.iter().enumerate() {
+            let path = PathBuf::from(dir);
+            let exists = path.exists();
+            let status = if exists { "" } else { " (not found)" };
+            println!("  {}. {}{}", i + 1, dir, status);
+        }
+    }
+    println!();
+    Ok(())
+}
+
+/// `melange remove /path` — unregister a model directory.
+pub fn run_remove_command(path_str: &str) -> Result<()> {
+    let path = expand_tilde(path_str);
+    let canonical = path.canonicalize()
+        .unwrap_or_else(|_| path.clone());
+
+    let mut cfg = load_config_or_default()?;
+    let before = cfg.model_dirs.len();
+
+    cfg.model_dirs.retain(|existing| {
+        let existing_canonical = PathBuf::from(existing).canonicalize()
+            .unwrap_or_else(|_| PathBuf::from(existing));
+        existing_canonical != canonical
+    });
+
+    println!();
+    if cfg.model_dirs.len() < before {
+        save_config(&cfg)?;
+        println!("  Removed: {}", path.display());
+        println!("  ({} director{} remaining)", cfg.model_dirs.len(),
+            if cfg.model_dirs.len() == 1 { "y" } else { "ies" });
+    } else {
+        println!("  Not found in config: {}", path.display());
+        println!("  Run `melange dirs` to see registered directories.");
+    }
+    println!();
+    Ok(())
 }
 
 /// Interactive `melange config` subcommand.
 pub fn run_config_command() -> Result<()> {
     let path = config_path()?;
+    let cfg = load_config_or_default()?;
 
     println!();
     println!("  Melange Configuration");
     println!("  Config file: {}", path.display());
     println!();
 
-    match load_config()? {
-        Some(cfg) => {
-            println!("  Current model directory: {}", cfg.model_dir);
-        }
-        None => {
-            println!("  No config file found (using defaults).");
-            println!("  Default model directory: {}", default_model_dir().display());
-        }
-    }
-
-    println!();
-    print!("  Change model directory? [y/N] ");
-    io::stdout().flush()?;
-
-    let mut answer = String::new();
-    io::stdin().lock().read_line(&mut answer)?;
-
-    if answer.trim().eq_ignore_ascii_case("y") {
-        let model_dir = prompt_model_dir("  New model directory path: ")?;
-        let cfg = MelangeConfig {
-            model_dir: model_dir.to_string_lossy().to_string(),
-        };
-        save_config(&cfg)?;
-        println!();
-        println!("  Updated! Model directory: {}", model_dir.display());
+    if cfg.model_dirs.is_empty() {
+        println!("  No model directories registered.");
     } else {
-        println!("  No changes made.");
+        println!("  Model directories:");
+        for (i, dir) in cfg.model_dirs.iter().enumerate() {
+            println!("    {}. {}", i + 1, dir);
+        }
     }
 
     println!();
+    println!("  Commands:");
+    println!("    melange add /path     Add a model directory");
+    println!("    melange remove /path  Remove a model directory");
+    println!("    melange dirs          List all directories");
+    println!();
+
     Ok(())
 }

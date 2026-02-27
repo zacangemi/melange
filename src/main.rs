@@ -31,9 +31,9 @@ use models::memory_calc;
 #[command(name = "melange", version = "0.1.0")]
 #[command(about = "The memory must flow — local model memory analyzer for Apple Silicon")]
 struct Cli {
-    /// Path to model directory (overrides config for this run)
+    /// Scan a specific directory (one-time override, not saved)
     #[arg(long = "scan", value_name = "PATH", global = true)]
-    model_dir: Option<PathBuf>,
+    scan: Option<PathBuf>,
 
     /// Output as JSON instead of launching TUI
     #[arg(long, global = true)]
@@ -45,7 +45,19 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Show or change Melange configuration
+    /// Add a model directory
+    Add {
+        /// Path to the model directory
+        path: String,
+    },
+    /// List registered model directories
+    Dirs,
+    /// Remove a model directory
+    Remove {
+        /// Path to remove
+        path: String,
+    },
+    /// Show configuration
     Config,
 }
 
@@ -90,58 +102,58 @@ struct JsonEstimate {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Handle `melange config` subcommand
-    if let Some(Commands::Config) = cli.command {
-        return config::run_config_command();
+    // Handle subcommands
+    match cli.command {
+        Some(Commands::Add { path }) => return config::run_add_command(&path),
+        Some(Commands::Dirs) => return config::run_dirs_command(),
+        Some(Commands::Remove { path }) => return config::run_remove_command(&path),
+        Some(Commands::Config) => return config::run_config_command(),
+        None => {}
     }
 
-    let model_dir = resolve_model_dir(cli.model_dir)?;
+    let model_dirs = resolve_model_dirs(cli.scan)?;
 
     // Detect hardware
     let hardware = HardwareInfo::detect()?;
 
-    // Scan models
-    let models_result = models::scanner::scan_directory(&model_dir);
-    let found_models = match models_result {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("Warning: Could not scan models at {}: {}", model_dir.display(), e);
-            Vec::new()
-        }
-    };
+    // Scan all model directories
+    let found_models = models::scanner::scan_directories(&model_dirs);
 
     if cli.json {
         return output_json(&hardware, &found_models);
     }
 
     // Launch TUI
-    run_tui(hardware, found_models, model_dir)
+    run_tui(hardware, found_models, model_dirs)
 }
 
-/// Resolve the model directory with priority:
-/// 1. --scan flag (explicit CLI override)
+/// Resolve model directories with priority:
+/// 1. --scan flag (explicit CLI override — single dir, not saved)
 /// 2. Config file (~/.config/melange/config.toml)
 /// 3. Default ~/AI_MODELS/models/ if it exists (auto-saves to config)
 /// 4. First-run interactive prompt
-fn resolve_model_dir(cli_override: Option<PathBuf>) -> Result<PathBuf> {
-    // 1. CLI flag takes highest priority
+fn resolve_model_dirs(cli_override: Option<PathBuf>) -> Result<Vec<PathBuf>> {
+    // 1. CLI flag takes highest priority (single dir override)
     if let Some(path) = cli_override {
-        return Ok(path);
+        return Ok(vec![path]);
     }
 
     // 2. Check config file
     if let Some(cfg) = config::load_config()? {
-        return Ok(PathBuf::from(&cfg.model_dir));
+        if !cfg.model_dirs.is_empty() {
+            let dirs: Vec<PathBuf> = cfg.model_dirs.iter().map(PathBuf::from).collect();
+            return Ok(dirs);
+        }
     }
 
     // 3. Check if default directory exists (auto-save to config)
     let default_dir = config::default_model_dir();
     if default_dir.exists() && default_dir.is_dir() {
         let cfg = config::MelangeConfig {
-            model_dir: default_dir.to_string_lossy().to_string(),
+            model_dirs: vec![default_dir.to_string_lossy().to_string()],
         };
         config::save_config(&cfg)?;
-        return Ok(default_dir);
+        return Ok(vec![default_dir]);
     }
 
     // 4. First-run interactive prompt
@@ -194,7 +206,7 @@ fn output_json(hardware: &HardwareInfo, models: &[models::ModelInfo]) -> Result<
     Ok(())
 }
 
-fn run_tui(hardware: HardwareInfo, models: Vec<models::ModelInfo>, model_dir: PathBuf) -> Result<()> {
+fn run_tui(hardware: HardwareInfo, models: Vec<models::ModelInfo>, model_dirs: Vec<PathBuf>) -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -202,7 +214,7 @@ fn run_tui(hardware: HardwareInfo, models: Vec<models::ModelInfo>, model_dir: Pa
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(hardware, models, model_dir);
+    let mut app = App::new(hardware, models, model_dirs);
 
     // Main event loop
     loop {

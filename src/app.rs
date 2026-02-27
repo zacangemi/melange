@@ -17,7 +17,7 @@ pub struct App {
     pub hardware: HardwareInfo,
     pub models: Vec<ModelInfo>,
     pub analyses: Vec<ModelAnalysis>,
-    pub model_dir: PathBuf,
+    pub model_dirs: Vec<PathBuf>,
     pub selected_model: usize,
     pub quote_index: usize,
     pub splash_start: Instant,
@@ -26,7 +26,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(hardware: HardwareInfo, models: Vec<ModelInfo>, model_dir: PathBuf) -> Self {
+    pub fn new(hardware: HardwareInfo, models: Vec<ModelInfo>, model_dirs: Vec<PathBuf>) -> Self {
         let analyses: Vec<ModelAnalysis> = models
             .iter()
             .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs))
@@ -39,7 +39,7 @@ impl App {
             hardware,
             models,
             analyses,
-            model_dir,
+            model_dirs,
             selected_model: 0,
             quote_index: 0,
             splash_start: now,
@@ -94,18 +94,17 @@ impl App {
         if let Ok(hw) = HardwareInfo::detect() {
             self.hardware = hw;
         }
-        // Re-scan models
-        if let Ok(models) = crate::models::scanner::scan_directory(&self.model_dir) {
-            self.analyses = models
-                .iter()
-                .map(|m| {
-                    memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs)
-                })
-                .collect();
-            self.models = models;
-            if self.selected_model >= self.models.len() {
-                self.selected_model = 0;
-            }
+        // Re-scan all model directories
+        let models = crate::models::scanner::scan_directories(&self.model_dirs);
+        self.analyses = models
+            .iter()
+            .map(|m| {
+                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs)
+            })
+            .collect();
+        self.models = models;
+        if self.selected_model >= self.models.len() {
+            self.selected_model = 0;
         }
     }
 }

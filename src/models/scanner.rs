@@ -5,6 +5,20 @@ use super::ModelInfo;
 use super::config_parser;
 use super::index_parser;
 
+/// Scan multiple directories and merge results.
+pub fn scan_directories(dirs: &[PathBuf]) -> Vec<ModelInfo> {
+    let mut all_models = Vec::new();
+    for dir in dirs {
+        match scan_directory(dir) {
+            Ok(models) => all_models.extend(models),
+            Err(e) => {
+                eprintln!("Warning: Could not scan {}: {}", dir.display(), e);
+            }
+        }
+    }
+    all_models
+}
+
 /// Walk a directory looking for model subdirectories (those containing config.json).
 pub fn scan_directory(model_dir: &Path) -> Result<Vec<ModelInfo>> {
     let mut models = Vec::new();

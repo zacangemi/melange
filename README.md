@@ -55,19 +55,40 @@ The first time you run `melange`, it will ask where your models live:
 
   Model directory path: ~/AI_MODELS/models
 
+  Found 5 models:
+    Qwen3-30B-A3B (30.5B params, 4-bit)
+    GLM-4-9B (9.4B params, 6-bit)
+    ...
+
   Saved to ~/.config/melange/config.toml
+  Add more directories later with `melange add /path`.
 ```
 
-Your choice is saved and used for all future runs. If `~/AI_MODELS/models/` already exists on your machine, Melange will detect it automatically and skip the prompt.
+If `~/AI_MODELS/models/` already exists, Melange detects it automatically and skips the prompt.
 
 ## Usage
 
 ```bash
-melange                  # Launch the TUI dashboard
-melange config           # Show or change configuration
-melange --scan /path     # Override model directory for this run
-melange --json           # Output as JSON (for scripting)
+melange                      # Launch the TUI dashboard
+melange add ~/more/models    # Register another model directory
+melange dirs                 # List all registered directories
+melange remove ~/old/path    # Unregister a directory
+melange config               # Show configuration
+melange --scan /one-off      # Override for this run (not saved)
+melange --json               # Output as JSON (for scripting)
 ```
+
+### Multiple Model Directories
+
+Most people have models in more than one place. Melange supports this natively:
+
+```bash
+melange add ~/AI_MODELS/models
+melange add ~/.cache/huggingface/hub
+melange add /Volumes/external/models
+```
+
+All registered directories are scanned every time you launch the TUI. The panel title shows the directory count when you have more than one.
 
 ### Controls
 
@@ -83,18 +104,19 @@ Config file: `~/.config/melange/config.toml`
 
 ```toml
 # Melange configuration
-# Run `melange config` to change these settings
+# Manage directories with: melange add, melange dirs, melange remove
 
-model_dir = "/Users/you/AI_MODELS/models"
+model_dirs = [
+    "/Users/you/AI_MODELS/models",
+    "/Users/you/.cache/huggingface/hub",
+]
 ```
 
 Model directory resolution order:
-1. `--scan` flag (highest priority — explicit CLI override)
+1. `--scan` flag (highest priority — one-time override, not saved)
 2. Config file (`~/.config/melange/config.toml`)
 3. Default `~/AI_MODELS/models/` if it exists (auto-saved to config)
 4. First-run interactive prompt (only if nothing else works)
-
-Run `melange config` at any time to view or change your settings.
 
 ## What It Scans
 
@@ -108,6 +130,8 @@ Run `melange config` at any time to view or change your settings.
 **Models** (reads JSON metadata only — never touches weight files):
 - `config.json` — architecture, layers, attention heads, MoE experts, quantization
 - `model.safetensors.index.json` — exact parameter count and byte size
+
+Non-model files in your directories are ignored. Melange only picks up subdirectories containing valid model metadata.
 
 ## Spice Status
 
