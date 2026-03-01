@@ -52,11 +52,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let title = if app.model_dirs.len() == 1 {
-        format!(" LOCAL MODELS  [{}] ", app.model_dirs[0].to_string_lossy())
-    } else {
-        format!(" LOCAL MODELS  [{} directories] ", app.model_dirs.len())
-    };
+    let title = format!(" LOCAL MODELS ({}) ", app.models.len());
 
     let table = Table::new(
         rows,

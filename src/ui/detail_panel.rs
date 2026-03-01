@@ -68,13 +68,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    // Title line
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("  ▸ {}  (Selected)", model.name),
-            theme::highlight_style(),
-        ),
-    ]));
     lines.push(Line::from(""));
 
     // Key metrics row
