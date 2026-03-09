@@ -6,7 +6,7 @@ use ratatui::layout::Constraint;
 
 use super::theme;
 use crate::app::App;
-use crate::models::memory_calc::SpiceStatus;
+use crate::models::memory_calc::FitStatus;
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let header = Row::new(vec![
@@ -30,9 +30,9 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             let name = format!("{}{}", marker, &model.name);
 
             let status_style = match analysis.status {
-                SpiceStatus::AbundantSpice | SpiceStatus::SpiceThinning => theme::safe_style(),
-                SpiceStatus::SpiceScarcity => theme::highlight_style(),
-                SpiceStatus::DesertDrought => theme::danger_style(),
+                FitStatus::Fits | FitStatus::Tight => theme::safe_style(),
+                FitStatus::Limited => theme::highlight_style(),
+                FitStatus::OOM => theme::danger_style(),
             };
 
             let row_style = if is_selected {

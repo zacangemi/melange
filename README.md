@@ -135,14 +135,14 @@ Model directory resolution order:
 
 Non-model files in your directories are ignored. Melange only picks up subdirectories containing valid model metadata.
 
-## Spice Status
+## Fit Status
 
 | Status | Meaning |
 |--------|---------|
-| **Abundant Spice** | > 4 GB headroom, runs great |
-| **Spice Thinning** | 1-4 GB headroom, watch it |
-| **Spice Scarcity** | Tight fit, limited context |
-| **Desert Drought** | Will hit swap — don't run this |
+| **✓ Fits** | > 4 GB headroom, runs great |
+| **△ Tight** | 1-4 GB headroom, watch it |
+| **△ Limited** | Tight fit, limited context |
+| **✗ OOM** | Will hit swap — don't run this |
 
 ## Requirements
 

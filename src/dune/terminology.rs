@@ -1,20 +1,20 @@
-/// Tech → Dune term mapping
+/// Tech term mapping
 #[allow(dead_code)]
 pub fn term<'a>(tech_name: &'a str) -> &'a str {
     match tech_name {
-        "available_ram" => "Spice Reserves",
-        "compatibility" => "Melange Yield",
-        "gpu_cores" => "Maker Hooks",
-        "context_window" => "Prescient Horizon",
-        "tok_s" => "Spice Flow Rate",
-        "swap_danger" => "The Desert Claims",
-        "safe_to_run" => "The Spice Flows",
+        "available_ram" => "Memory Reserves",
+        "compatibility" => "Fit Status",
+        "gpu_cores" => "GPU Cores",
+        "context_window" => "Context Window",
+        "tok_s" => "Token Rate",
+        "swap_danger" => "OOM",
+        "safe_to_run" => "Fits",
         "max_safe_context" => "Horizon Limit",
-        "os_reserved" => "Spacing Guild Tax",
-        "weight_memory" => "Spice Weight",
-        "kv_cache" => "Prescient Cache",
-        "overhead" => "Guild Overhead",
-        "total_memory" => "Total Spice Demand",
+        "os_reserved" => "OS Reserved",
+        "weight_memory" => "Weight Memory",
+        "kv_cache" => "KV Cache",
+        "overhead" => "Overhead",
+        "total_memory" => "Total Memory",
         _ => tech_name,
     }
 }

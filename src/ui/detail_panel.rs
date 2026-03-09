@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 
 use super::theme;
 use crate::app::App;
-use crate::models::memory_calc::SpiceStatus;
+use crate::models::memory_calc::FitStatus;
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     if app.models.is_empty() {
@@ -37,9 +37,9 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // Status style
     let status_style = match analysis.status {
-        SpiceStatus::AbundantSpice | SpiceStatus::SpiceThinning => theme::safe_style(),
-        SpiceStatus::SpiceScarcity => theme::highlight_style(),
-        SpiceStatus::DesertDrought => theme::danger_style(),
+        FitStatus::Fits | FitStatus::Tight => theme::safe_style(),
+        FitStatus::Limited => theme::highlight_style(),
+        FitStatus::OOM => theme::danger_style(),
     };
 
     // Available RAM for models (total - OS reserved)
@@ -72,7 +72,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // Key metrics row
     lines.push(Line::from(vec![
-        Span::styled("  Spice Flow Rate:  ", theme::dim_style()),
+        Span::styled("  Token Rate:       ", theme::dim_style()),
         Span::styled(
             format!("~{:.0}-{:.0} tok/s", analysis.tok_s_low, analysis.tok_s_high),
             theme::highlight_style(),

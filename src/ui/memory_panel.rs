@@ -39,7 +39,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Spacing Guild Tax: ", theme::dim_style()),
+            Span::styled("  OS Reserved: ", theme::dim_style()),
             Span::styled("3.5G", theme::text_style()),
         ]),
         Line::from(vec![
@@ -53,7 +53,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     let panel = Paragraph::new(lines).block(
         Block::default()
-            .title(Span::styled(" SPICE RESERVES ", theme::title_style()))
+            .title(Span::styled(" MEMORY RESERVES ", theme::title_style()))
             .borders(Borders::ALL)
             .border_style(theme::border_style())
             .style(ratatui::style::Style::default().bg(theme::NIGHT_SKY)),

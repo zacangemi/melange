@@ -40,36 +40,36 @@ pub struct ModelAnalysis {
     pub estimates: Vec<MemoryEstimate>,  // at various context lengths
     pub max_safe_context: u64,
     pub headroom_bytes: i64,             // at lowest context (4K)
-    pub status: SpiceStatus,
+    pub status: FitStatus,
     pub tok_s_low: f64,
     pub tok_s_high: f64,
     pub kv_per_token_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub enum SpiceStatus {
-    AbundantSpice,   // > 4 GB headroom
-    SpiceThinning,   // 1-4 GB headroom
-    SpiceScarcity,   // 0-1 GB headroom
-    DesertDrought,   // negative headroom = swap
+pub enum FitStatus {
+    Fits,      // > 4 GB headroom
+    Tight,     // 1-4 GB headroom
+    Limited,   // 0-1 GB headroom
+    OOM,       // negative headroom = swap
 }
 
-impl SpiceStatus {
+impl FitStatus {
     pub fn label(&self) -> &str {
         match self {
-            SpiceStatus::AbundantSpice => "Abundant Spice",
-            SpiceStatus::SpiceThinning => "Spice Thinning",
-            SpiceStatus::SpiceScarcity => "Spice Scarcity",
-            SpiceStatus::DesertDrought => "Desert Drought",
+            FitStatus::Fits => "Fits",
+            FitStatus::Tight => "Tight",
+            FitStatus::Limited => "Limited",
+            FitStatus::OOM => "OOM",
         }
     }
 
     pub fn icon(&self) -> &str {
         match self {
-            SpiceStatus::AbundantSpice => "✓ Flows",
-            SpiceStatus::SpiceThinning => "⚠ Thin",
-            SpiceStatus::SpiceScarcity => "⚠ Scarce",
-            SpiceStatus::DesertDrought => "✗ Drought",
+            FitStatus::Fits => "✓ Fits",
+            FitStatus::Tight => "△ Tight",
+            FitStatus::Limited => "△ Limited",
+            FitStatus::OOM => "✗ OOM",
         }
     }
 }
@@ -183,23 +183,23 @@ pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64) -> M
     }
 }
 
-fn classify_status(headroom_bytes: i64, max_safe_ctx: u64) -> SpiceStatus {
+fn classify_status(headroom_bytes: i64, max_safe_ctx: u64) -> FitStatus {
     let headroom_gb = headroom_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
 
     // If model doesn't fit at all at 4K, or max safe context is too small for real use
     if headroom_gb < 0.0 || max_safe_ctx < 8192 {
-        return SpiceStatus::DesertDrought;
+        return FitStatus::OOM;
     }
 
     if max_safe_ctx < 16384 {
-        return SpiceStatus::SpiceScarcity;
+        return FitStatus::Limited;
     }
 
     if headroom_gb > 4.0 {
-        SpiceStatus::AbundantSpice
+        FitStatus::Fits
     } else if headroom_gb > 1.0 {
-        SpiceStatus::SpiceThinning
+        FitStatus::Tight
     } else {
-        SpiceStatus::SpiceScarcity
+        FitStatus::Limited
     }
 }
