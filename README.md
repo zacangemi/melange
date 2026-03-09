@@ -40,9 +40,11 @@ Requires [Rust](https://rustup.rs/):
 ```bash
 git clone https://github.com/zacangemi/melange.git
 cd melange
-cargo build --release
+cargo build --release --jobs 4
 cp target/release/melange ~/.melange/bin/
 ```
+
+> **Note:** The `--jobs 4` flag prevents build failures on some machines where full parallelism causes processes to get killed by macOS. You can omit it if your build succeeds without it.
 
 ## First Run
 

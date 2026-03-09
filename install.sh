@@ -68,8 +68,8 @@ if [ -z "$DOWNLOAD_URL" ]; then
     git clone --depth 1 "https://github.com/${REPO}.git" "$TMPDIR/melange"
     cd "$TMPDIR/melange"
 
-    echo "Building (this takes about 10 seconds)..."
-    cargo build --release
+    echo "Building (this takes about 30 seconds)..."
+    cargo build --release --jobs 4
 
     echo "Installing to ${INSTALL_DIR}..."
     cp "target/release/${BINARY}" "${INSTALL_DIR}/${BINARY}"
