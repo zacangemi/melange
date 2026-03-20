@@ -70,14 +70,22 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     lines.push(Line::from(""));
 
-    // Key metrics row
+    // Speed metrics
     lines.push(Line::from(vec![
-        Span::styled("  Token Rate:       ", theme::dim_style()),
+        Span::styled("  Prefill:          ", theme::dim_style()),
+        Span::styled(
+            format!("~{:.0}-{:.0} tok/s", analysis.prefill_tok_s_low, analysis.prefill_tok_s_high),
+            theme::highlight_style(),
+        ),
+        Span::styled(expert_info, theme::dim_style()),
+    ]));
+
+    lines.push(Line::from(vec![
+        Span::styled("  Generation:       ", theme::dim_style()),
         Span::styled(
             format!("~{:.0}-{:.0} tok/s", analysis.tok_s_low, analysis.tok_s_high),
             theme::highlight_style(),
         ),
-        Span::styled(expert_info, theme::dim_style()),
     ]));
 
     lines.push(Line::from(vec![
@@ -93,8 +101,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("  KV Cache Growth:", theme::title_style()),
     ]));
 
-    // Build context length rows
-    for est in analysis.estimates.iter().take(6) {
+    // Build context length rows with delta
+    for (i, est) in analysis.estimates.iter().take(6).enumerate() {
         let ctx_label = if est.context_length >= 1024 {
             format!("{}K", est.context_length / 1024)
         } else {
@@ -109,10 +117,18 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             (" SWAP", theme::danger_style())
         };
 
+        let delta = if i > 0 {
+            let prev_kv = analysis.estimates[i - 1].kv_cache_gb();
+            format!(" +{:.1}G ", est.kv_cache_gb() - prev_kv)
+        } else {
+            "       ".to_string()
+        };
+
         lines.push(Line::from(vec![
             Span::styled(format!("    {:>6} ctx ", ctx_label), theme::dim_style()),
             Span::styled(format!("KV: {:>6.1} GB", est.kv_cache_gb()), theme::text_style()),
-            Span::styled("  │  ", theme::dim_style()),
+            Span::styled(delta, theme::dim_style()),
+            Span::styled("│  ", theme::dim_style()),
             Span::styled(format!("Total: {:>5.1} GB", est_total), theme::text_style()),
             Span::styled(indicator, ind_style),
         ]));

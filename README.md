@@ -17,9 +17,9 @@ Running LLMs locally on Apple Silicon? Memory is everything. A model that looks 
 
 Melange scans your hardware, reads your model metadata, does the math, and shows you:
 - Will it fit in memory?
-- How fast will it generate tokens?
+- How fast will it generate tokens? (both prefill and decode speed)
 - At what context length will it hit swap?
-- KV cache growth at every context size
+- KV cache growth at every context size (with per-step memory deltas)
 
 No Ollama. No APIs. No cloud. Pure local analysis.
 

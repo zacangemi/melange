@@ -84,6 +84,7 @@ struct JsonModelEntry {
 struct JsonAnalysis {
     status: String,
     tok_s_range: [f64; 2],
+    prefill_tok_s_range: [f64; 2],
     max_safe_context: u64,
     kv_per_token_bytes: u64,
     headroom_gb: f64,
@@ -178,6 +179,7 @@ fn output_json(hardware: &HardwareInfo, models: &[models::ModelInfo]) -> Result<
                 analysis: JsonAnalysis {
                     status: analysis.status.label().to_string(),
                     tok_s_range: [analysis.tok_s_low, analysis.tok_s_high],
+                    prefill_tok_s_range: [analysis.prefill_tok_s_low, analysis.prefill_tok_s_high],
                     max_safe_context: analysis.max_safe_context,
                     kv_per_token_bytes: analysis.kv_per_token_bytes,
                     headroom_gb: analysis.headroom_bytes as f64 / (1024.0 * 1024.0 * 1024.0),

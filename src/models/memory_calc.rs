@@ -43,6 +43,8 @@ pub struct ModelAnalysis {
     pub status: FitStatus,
     pub tok_s_low: f64,
     pub tok_s_high: f64,
+    pub prefill_tok_s_low: f64,
+    pub prefill_tok_s_high: f64,
     pub kv_per_token_bytes: u64,
 }
 
@@ -150,6 +152,14 @@ pub fn estimate_tok_s(model: &ModelInfo, bandwidth_gbs: f64) -> (f64, f64) {
     (low, high)
 }
 
+/// Estimate prefill (prompt processing) tok/s.
+/// Prefill processes tokens in batches, achieving much higher throughput than decode.
+/// Typically 10-20x faster than single-token decode on Apple Silicon.
+pub fn estimate_prefill_tok_s(model: &ModelInfo, bandwidth_gbs: f64) -> (f64, f64) {
+    let (decode_low, decode_high) = estimate_tok_s(model, bandwidth_gbs);
+    (decode_low * 10.0, decode_high * 20.0)
+}
+
 /// Full analysis of a model against specific hardware
 pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64) -> ModelAnalysis {
     let context_lengths = [4096, 8192, 16384, 32768, 65536, 131072];
@@ -162,6 +172,7 @@ pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64) -> M
 
     let max_ctx = max_safe_context(model, total_ram_bytes);
     let (tok_s_low, tok_s_high) = estimate_tok_s(model, bandwidth_gbs);
+    let (prefill_low, prefill_high) = estimate_prefill_tok_s(model, bandwidth_gbs);
 
     // Headroom at 4K context
     let est_4k = estimate_at_context(model, 4096);
@@ -179,6 +190,8 @@ pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64) -> M
         status,
         tok_s_low,
         tok_s_high,
+        prefill_tok_s_low: prefill_low,
+        prefill_tok_s_high: prefill_high,
         kv_per_token_bytes: kv_per_tok,
     }
 }
