@@ -20,6 +20,7 @@ pub struct MemoryInfo {
     pub total_bytes: u64,
     pub used_bytes: u64,
     pub available_bytes: u64,
+    pub wired_bytes: u64,
     pub swap_total_bytes: u64,
     pub swap_used_bytes: u64,
     pub is_unified: bool,
@@ -37,6 +38,10 @@ impl MemoryInfo {
 
     pub fn available_gb(&self) -> f64 {
         self.available_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+    }
+
+    pub fn wired_gb(&self) -> f64 {
+        self.wired_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
     }
 
     pub fn usage_percent(&self) -> f64 {
@@ -65,10 +70,14 @@ pub fn detect() -> Result<MemoryInfo> {
     // Detect top non-system processes by memory usage
     let top_processes = detect_top_processes(&mut sys);
 
+    // Wired memory = truly non-reclaimable (kernel + pinned pages)
+    let wired_bytes = detect_wired_memory().unwrap_or(4_294_967_296); // 4G fallback
+
     Ok(MemoryInfo {
         total_bytes,
         used_bytes,
         available_bytes,
+        wired_bytes,
         swap_total_bytes,
         swap_used_bytes,
         is_unified,
@@ -84,6 +93,33 @@ fn sysctl_memsize() -> Option<u64> {
         .ok()?;
     let s = String::from_utf8_lossy(&output.stdout);
     s.trim().parse::<u64>().ok()
+}
+
+/// Detect wired (non-reclaimable) memory from macOS vm_stat.
+/// This is memory pinned in RAM that cannot be compressed or swapped —
+/// the true floor of what the OS needs to function.
+fn detect_wired_memory() -> Option<u64> {
+    let output = Command::new("vm_stat").output().ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+
+    // Parse page size from header: "Mach Virtual Memory Statistics: (page size of 16384 bytes)"
+    let page_size: u64 = text.lines().next()
+        .and_then(|line| line.split("page size of ").nth(1))
+        .and_then(|s| s.split(' ').next())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(16384); // Apple Silicon default
+
+    // Parse "Pages wired down:    308367."
+    for line in text.lines() {
+        if line.contains("Pages wired down") {
+            let pages: u64 = line.split(':').nth(1)?
+                .trim()
+                .trim_end_matches('.')
+                .parse().ok()?;
+            return Some(pages * page_size);
+        }
+    }
+    None
 }
 
 fn is_apple_silicon() -> bool {

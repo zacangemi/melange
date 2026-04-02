@@ -116,8 +116,9 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
         FitStatus::OOM => theme::danger_style(),
     };
 
-    let os_used_gb = app.hardware.memory.used_gb();
-    let avail_gb = (total_ram as f64 / (1024.0 * 1024.0 * 1024.0)) - os_used_gb.max(2.5);
+    // Available = total RAM minus wired (non-reclaimable) memory
+    let wired_gb = app.hardware.memory.wired_gb();
+    let avail_gb = (total_ram as f64 / (1024.0 * 1024.0 * 1024.0)) - wired_gb;
 
     let horizon = if analysis.max_safe_context > 1024 {
         format!("{}K tokens", analysis.max_safe_context / 1024)
@@ -178,7 +179,7 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
         };
 
         let est_total = est.total_gb();
-        let fits = est_total <= (total_ram as f64 / (1024.0 * 1024.0 * 1024.0));
+        let fits = est_total <= avail_gb;
         let (indicator, ind_style) = if fits {
             ("  OK ", theme::safe_style())
         } else {

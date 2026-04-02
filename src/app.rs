@@ -44,7 +44,7 @@ impl App {
     pub fn new(hardware: HardwareInfo, models: Vec<ModelInfo>, model_dirs: Vec<PathBuf>, vpn_preference: Option<String>) -> Self {
         let analyses: Vec<ModelAnalysis> = models
             .iter()
-            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.used_bytes))
+            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.wired_bytes))
             .collect();
 
         let compat_db = crate::compat::warnings::load_compat_db();
@@ -62,7 +62,7 @@ impl App {
         let catalog_models = crate::models::catalog::catalog_models();
         let catalog_analyses: Vec<ModelAnalysis> = catalog_models
             .iter()
-            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.used_bytes))
+            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.wired_bytes))
             .collect();
 
         let now = Instant::now();
@@ -181,7 +181,7 @@ impl App {
         self.analyses = models
             .iter()
             .map(|m| {
-                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.used_bytes)
+                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.wired_bytes)
             })
             .collect();
         // Recompute compatibility warnings
@@ -204,7 +204,7 @@ impl App {
         self.catalog_analyses = self.catalog_models
             .iter()
             .map(|m| {
-                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.used_bytes)
+                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.wired_bytes)
             })
             .collect();
     }

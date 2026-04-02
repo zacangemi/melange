@@ -1,7 +1,7 @@
 use serde::Serialize;
 use super::ModelInfo;
 
-const MIN_OS_RESERVED_BYTES: u64 = 2_684_354_560; // 2.5 GB floor — OS always needs at least this
+const OS_WIRED_FALLBACK: u64 = 4_294_967_296; // 4 GB fallback if vm_stat detection fails
 const RUNTIME_OVERHEAD_FRACTION: f64 = 0.10;
 const BUFFER_BYTES: u64 = 1_073_741_824; // 1 GB safety buffer
 
@@ -109,7 +109,7 @@ pub fn estimate_at_context(model: &ModelInfo, context_len: u64, os_used_bytes: u
         kv_cache_bytes: kv_bytes,
         overhead_bytes,
         os_reserved_bytes: os_used_bytes,
-        total_bytes: weight_bytes + kv_bytes + overhead_bytes + os_used_bytes,
+        total_bytes: weight_bytes + kv_bytes + overhead_bytes,
         context_length: context_len,
     }
 }
@@ -162,9 +162,11 @@ pub fn estimate_prefill_tok_s(model: &ModelInfo, bandwidth_gbs: f64) -> (f64, f6
 
 /// Full analysis of a model against specific hardware.
 /// `os_used_bytes` is the current non-model memory usage (OS + apps).
-pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64, os_used_bytes: u64) -> ModelAnalysis {
-    // Use actual OS usage, but never less than 2.5 GB floor
-    let os_reserved = os_used_bytes.max(MIN_OS_RESERVED_BYTES);
+pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64, wired_bytes: u64) -> ModelAnalysis {
+    // Wired memory = truly non-reclaimable (kernel + pinned pages).
+    // macOS compresses/swaps everything else under memory pressure,
+    // so wired is the accurate floor for model fit calculations.
+    let os_reserved = if wired_bytes > 0 { wired_bytes } else { OS_WIRED_FALLBACK };
 
     let context_lengths = [4096, 8192, 16384, 32768, 65536, 131072];
 
@@ -180,7 +182,7 @@ pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64, os_u
 
     // Headroom at 4K context
     let est_4k = estimate_at_context(model, 4096, os_reserved);
-    let headroom = total_ram_bytes as i64 - est_4k.total_bytes as i64;
+    let headroom = total_ram_bytes as i64 - est_4k.total_bytes as i64 - os_reserved as i64;
 
     // Classify considering both headroom and practical usability
     let status = classify_status(headroom, max_ctx);
