@@ -6,6 +6,7 @@ use ratatui::layout::Constraint;
 
 use super::theme;
 use crate::app::App;
+use crate::compat::warnings::WarningSeverity;
 use crate::models::memory_calc::FitStatus;
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -15,6 +16,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         Cell::from(Span::styled("Type", theme::dim_style())),
         Cell::from(Span::styled("Quant", theme::dim_style())),
         Cell::from(Span::styled("Size", theme::dim_style())),
+        Cell::from(Span::styled("Warn", theme::dim_style())),
         Cell::from(Span::styled("Status", theme::dim_style())),
     ]);
 
@@ -41,12 +43,34 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                 theme::text_style()
             };
 
+            // Warning badge: worst severity icon + count
+            let warnings = &app.warnings[i];
+            let badge_cell = if warnings.is_empty() {
+                Cell::from(Span::raw(""))
+            } else {
+                let worst = warnings
+                    .iter()
+                    .map(|w| &w.severity)
+                    .min()
+                    .unwrap();
+                let badge_style = match worst {
+                    WarningSeverity::Breaking => theme::highlight_style(),
+                    WarningSeverity::Caution => theme::highlight_style(),
+                    WarningSeverity::Info => theme::dim_style(),
+                };
+                Cell::from(Span::styled(
+                    format!("{} {}", worst.icon(), warnings.len()),
+                    badge_style,
+                ))
+            };
+
             Row::new(vec![
                 Cell::from(Span::styled(name, row_style)),
                 Cell::from(Span::styled(format!("{:.1}B", model.params_billions()), row_style)),
                 Cell::from(Span::styled(model.type_label().to_string(), row_style)),
                 Cell::from(Span::styled(model.quant_label(), row_style)),
                 Cell::from(Span::styled(format!("{:.1}G", model.size_gb()), row_style)),
+                badge_cell,
                 Cell::from(Span::styled(analysis.status.icon().to_string(), status_style)),
             ])
         })
@@ -62,7 +86,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(6),
             Constraint::Length(6),
             Constraint::Length(7),
-            Constraint::Length(12),
+            Constraint::Length(5),
+            Constraint::Length(11),
         ],
     )
     .header(header)

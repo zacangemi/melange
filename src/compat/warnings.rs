@@ -24,8 +24,13 @@ pub struct CompatWarning {
 
     pub severity: WarningSeverity,
     pub summary: String,
-    #[allow(dead_code)]
     pub detail: Option<String>,
+    #[serde(default)]
+    pub workaround: Option<String>,
+    #[serde(default)]
+    pub fixed_in: Option<String>,
+    #[serde(default)]
+    pub references: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, PartialOrd, Ord)]

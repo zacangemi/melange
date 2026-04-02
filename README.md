@@ -3,12 +3,23 @@
 A Dune-themed terminal tool that scans your Apple Silicon hardware and local model files to tell you exactly what fits, how fast it'll run, and when you'll hit swap.
 
 ```
-    ___
-___/ o \____
-   ___     \___________
-  /   \___             \
-           \___   ___  |
-               \_/  \_|
+                          .  '  .
+            \  ' .  /    ' .  . '   .  '                                        ___
+         --  \  |  / --      '                                                 / _ \
+        '  ---\|//---  .        .                                             | / \ |
+          -====(●)====-                        .          .                    |  _  |
+        .  ---/|\---  '     .          ___---~~~~---___                        \ \_/ |
+         --  /  |  \ --          ___--~~  //||||\\  ~~--___                     \___/
+            /  ' .  \     ___--~~   //  ||||||||  \\   ~~--___                   |
+          '    .    ___--~~ ///  ||||  ||||||||  ||||  \\\ ~~--___              /
+           ___..--~~ // ||||||||  ||||   ||||||   ||||  |||||||| \\ ~~--..__/
+     __--~~  ///  |||| ||||||||  ||||    ||||    ||||  |||||||| ||||  \\\  ~~--
+   ~~  //  ||||||  |||| ||||||||  ||||    ||||    ||||  |||||||| ||||  ||||||  \\
+    \\  ||||  ||||  ||||  ||||||  ||||    ||||    ||||  ||||||  ||||  ||||  //
+      \\  ||||  ||||  \\  ||||  ||||    ||||    ||||  ||||  //  ||||  //
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ~~.~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~  ~~
+      .  i i .    i i .    i i .    i i      i i .    i i .    i i .    i i .
 ```
 
 ## Why?
@@ -20,6 +31,7 @@ Melange scans your hardware, reads your model metadata, does the math, and shows
 - How fast will it generate tokens? (both prefill and decode speed)
 - At what context length will it hit swap?
 - KV cache growth at every context size (with per-step memory deltas)
+- Known engine bugs for your specific models
 
 No Ollama. No APIs. No cloud. Pure local analysis.
 
@@ -97,8 +109,21 @@ All registered directories are scanned every time you launch the TUI. The panel 
 | Key | Action |
 |-----|--------|
 | `j` / `k` or arrows | Navigate models |
+| `Tab` | Switch between Local / Catalog tabs |
 | `r` | Refresh hardware & models |
+| `v` | Toggle VPN info |
+| `w` | Engine warning detail |
+| `?` | Show help overlay |
 | `q` / `Esc` | Quit |
+
+## Dashboard
+
+The TUI has two tabs:
+
+- **Local** — Scans your model directories and analyzes every model against your real hardware. Models are sorted by fit status (Fits first, OOM last) so you see what you can run at a glance.
+- **Catalog** — Pre-configured reference models (Llama 3.3, DeepSeek R1, Mixtral, etc.) analyzed against your hardware, even if you haven't downloaded them yet. Useful for deciding what to download.
+
+Both tabs show the same analysis: speed estimates, KV cache growth, memory breakdown, fit status, and engine warnings.
 
 ## Configuration
 
@@ -124,10 +149,12 @@ Model directory resolution order:
 
 **Hardware:**
 - CPU (brand, P/E core split)
-- Unified memory (total, used, available)
+- Unified memory (total, used, available, top memory consumers)
 - GPU cores + Metal version
 - Memory bandwidth (for tok/s estimation)
 - Disk space
+- Installed inference engines (llama.cpp, MLX, Ollama, vLLM, ExLlamaV2)
+- VPN status (Tailscale)
 
 **Models** (reads JSON metadata only — never touches weight files):
 - `config.json` — architecture, layers, attention heads, MoE experts, quantization
@@ -143,6 +170,25 @@ Non-model files in your directories are ignored. Melange only picks up subdirect
 | **△ Tight** | 1-4 GB headroom, watch it |
 | **△ Limited** | Tight fit, limited context |
 | **✗ OOM** | Will hit swap — don't run this |
+
+## Engine Warnings
+
+Melange ships a built-in compatibility knowledge base of 50+ documented bugs across llama.cpp, Ollama, MLX, vLLM, and ExLlamaV2. Warnings are matched per-model based on architecture, family, and which engines you have installed.
+
+**Three layers of progressive disclosure:**
+
+1. **Badge in model table** — A severity icon + count appears in the `Warn` column next to models with known issues. No badge = clean model.
+2. **Inline in detail panel** — The top 3 warnings show in the detail panel with a hint to press `w` for more.
+3. **Full overlay on `w`** — A popup with severity labels, summaries, workarounds, version fix info, and detail text for every matched warning.
+
+Each warning includes:
+- **Severity** — Breaking (model won't work) or Caution (works with caveats)
+- **Summary** — One-line description of the issue
+- **Detail** — Full explanation with context
+- **Workaround** — Flags or settings to fix it (when available)
+- **Fixed in** — Engine version where the bug was resolved
+
+You can add your own warnings or override built-in ones by creating `~/.config/melange/compat_warnings.toml`.
 
 ## Requirements
 

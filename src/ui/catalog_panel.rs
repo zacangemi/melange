@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 
 use super::theme;
 use crate::app::App;
+use crate::compat::warnings::WarningSeverity;
 use crate::models::memory_calc::FitStatus;
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -30,6 +31,7 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
         Cell::from(Span::styled("Type", theme::dim_style())),
         Cell::from(Span::styled("Quant", theme::dim_style())),
         Cell::from(Span::styled("Size", theme::dim_style())),
+        Cell::from(Span::styled("Warn", theme::dim_style())),
         Cell::from(Span::styled("Status", theme::dim_style())),
     ]);
 
@@ -56,12 +58,30 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
                 theme::text_style()
             };
 
+            // Warning badge
+            let warnings = &app.catalog_warnings[i];
+            let badge_cell = if warnings.is_empty() {
+                Cell::from(Span::raw(""))
+            } else {
+                let worst = warnings.iter().map(|w| &w.severity).min().unwrap();
+                let badge_style = match worst {
+                    WarningSeverity::Breaking => theme::highlight_style(),
+                    WarningSeverity::Caution => theme::highlight_style(),
+                    WarningSeverity::Info => theme::dim_style(),
+                };
+                Cell::from(Span::styled(
+                    format!("{} {}", worst.icon(), warnings.len()),
+                    badge_style,
+                ))
+            };
+
             Row::new(vec![
                 Cell::from(Span::styled(name, row_style)),
                 Cell::from(Span::styled(format!("{:.1}B", model.params_billions()), row_style)),
                 Cell::from(Span::styled(model.type_label().to_string(), row_style)),
                 Cell::from(Span::styled(model.quant_label(), row_style)),
                 Cell::from(Span::styled(format!("{:.1}G", model.size_gb()), row_style)),
+                badge_cell,
                 Cell::from(Span::styled(analysis.status.icon().to_string(), status_style)),
             ])
         })
@@ -77,7 +97,8 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(6),
             Constraint::Length(6),
             Constraint::Length(7),
-            Constraint::Length(12),
+            Constraint::Length(5),
+            Constraint::Length(11),
         ],
     )
     .header(header)
@@ -143,16 +164,16 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(""));
 
     lines.push(Line::from(vec![
-        Span::styled("  Prefill:          ", theme::dim_style()),
+        Span::styled("  Prefill:       ", theme::dim_style()),
         Span::styled(
             format!("~{:.0}-{:.0} tok/s", analysis.prefill_tok_s_low, analysis.prefill_tok_s_high),
             theme::highlight_style(),
         ),
-        Span::styled(expert_info, theme::dim_style()),
+        Span::styled(&expert_info, theme::dim_style()),
     ]));
 
     lines.push(Line::from(vec![
-        Span::styled("  Generation:       ", theme::dim_style()),
+        Span::styled("  Generation:    ", theme::dim_style()),
         Span::styled(
             format!("~{:.0}-{:.0} tok/s", analysis.tok_s_low, analysis.tok_s_high),
             theme::highlight_style(),
@@ -160,7 +181,7 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
     ]));
 
     lines.push(Line::from(vec![
-        Span::styled("  Horizon Limit:    ", theme::dim_style()),
+        Span::styled("  Horizon Limit: ", theme::dim_style()),
         Span::styled(&horizon, theme::highlight_style()),
         Span::styled("  (max safe context before swap)", theme::dim_style()),
     ]));
@@ -233,6 +254,42 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled(analysis.status.label(), status_style),
     ]));
+
+    // Engine warnings (from compat KB)
+    let warnings = &app.catalog_warnings[app.selected_catalog_model];
+    if !warnings.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("  Engine Warnings ({}):", warnings.len()),
+                theme::title_style(),
+            ),
+            Span::styled("  press 'w' for detail", theme::dim_style()),
+        ]));
+
+        let max_inline = 3;
+        for w in warnings.iter().take(max_inline) {
+            let severity_style = match w.severity {
+                WarningSeverity::Info => theme::dim_style(),
+                WarningSeverity::Caution => theme::highlight_style(),
+                WarningSeverity::Breaking => theme::highlight_style(),
+            };
+            lines.push(Line::from(vec![
+                Span::styled(format!("    {} ", w.severity.icon()), severity_style),
+                Span::styled(format!("[{}] ", w.engine), theme::dim_style()),
+                Span::styled(&w.summary, severity_style),
+            ]));
+        }
+
+        if warnings.len() > max_inline {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("    ... and {} more (press 'w')", warnings.len() - max_inline),
+                    theme::dim_style(),
+                ),
+            ]));
+        }
+    }
 
     let title = format!(" ▸ {}  ", model.name);
     let panel = Paragraph::new(lines).block(

@@ -6,7 +6,7 @@ use ratatui::text::{Line, Span};
 use super::theme;
 
 pub fn draw(f: &mut Frame) {
-    let area = centered_rect(44, 16, f.area());
+    let area = centered_rect(44, 18, f.area());
 
     // Clear the area behind the popup
     f.render_widget(Clear, area);
@@ -36,6 +36,10 @@ pub fn draw(f: &mut Frame) {
         Line::from(vec![
             Span::styled("  v", theme::highlight_style()),
             Span::styled("            Toggle VPN IP", theme::text_style()),
+        ]),
+        Line::from(vec![
+            Span::styled("  w", theme::highlight_style()),
+            Span::styled("            Engine warnings", theme::text_style()),
         ]),
         Line::from(vec![
             Span::styled("  ?", theme::highlight_style()),

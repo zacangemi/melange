@@ -5,14 +5,31 @@ use ratatui::text::{Line, Span};
 
 use super::theme;
 
-const SANDWORM: &str = r#"
-         ___
-    ___/ o \____
-       ___     \___________
-      /   \___             \
-               \___   ___  |
-                   \_/  \_|
-"#;
+// Arrakeen mansion mural — Shai-Hulud
+// Circular mouth with radiating lines on left, thick segmented S-curve body,
+// body loops upward with spiral curl, tiny Fremen figures along the bottom dunes.
+const WORM_BODY: &[&str] = &[
+    r"                          .  '  .                                                       ",
+    r"            \  ' .  /    ' .  . '   .  '                                        ___     ",
+    r"         --  \  |  / --      '                                                 / _ \    ",
+    r"        '  ---\\|//---  .        .                                             | / \ |   ",
+    r"          -====(●)====-                        .          .                    |  _  |   ",
+    r"        .  ---/|\\---  '     .          ___---~~~~---___                        \ \_/ |  ",
+    r"         --  /  |  \ --          ___--~~  //||||\\\\  ~~--___                    \___/   ",
+    r"            /  ' .  \     ___--~~   ////  ||||||||  \\\\   ~~--___                 |    ",
+    r"          '    .    ___--~~ //////  ||||  ||||||||  ||||  \\\\\\ ~~--___          /     ",
+    r"           ___..--~~ //// ||||||||  ||||   ||||||   ||||  |||||||| \\\\ ~~--..__/      ",
+    r"     __--~~  //////  |||| ||||||||  ||||    ||||    ||||  |||||||| ||||  \\\\\\  ~~--   ",
+    r"   ~~  ////  ||||||  |||| ||||||||  ||||    ||||    ||||  |||||||| ||||  ||||||  \\\\   ",
+    r"    \\\\  ||||  ||||  ||||  ||||||  ||||    ||||    ||||  ||||||  ||||  ||||  ////      ",
+    r"      \\\\  ||||  ||||  \\\\  ||||  ||||    ||||    ||||  ||||  ////  ||||  ////        ",
+    r"  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    r"  ~~.~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~  ~~   ",
+    r"      .  i i .    i i .    i i .    i i      i i .    i i .    i i .    i i .             ",
+];
+
+// Lines that are sand/dunes (rendered in DEEP_DESERT)
+const DUNE_START: usize = 14;
 
 pub fn draw(f: &mut Frame) {
     let area = f.area();
@@ -20,30 +37,49 @@ pub fn draw(f: &mut Frame) {
 
     let mut lines: Vec<Line> = Vec::new();
 
-    // Add vertical padding
-    let art_height = 10;
-    let pad_top = area.height.saturating_sub(art_height as u16) / 2;
+    // Vertical centering
+    let art_height: u16 = WORM_BODY.len() as u16 + 4;
+    let pad_top = area.height.saturating_sub(art_height) / 2;
     for _ in 0..pad_top {
         lines.push(Line::from(""));
     }
 
-    // Sandworm ASCII art
-    for line in SANDWORM.lines() {
-        lines.push(Line::from(Span::styled(line.to_string(), theme::highlight_style())));
+    // Horizontal centering
+    let max_art_width = WORM_BODY.iter().map(|l| l.len()).max().unwrap_or(0);
+    let h_pad = (area.width as usize).saturating_sub(max_art_width) / 2;
+    let pad_str = " ".repeat(h_pad);
+
+    // Render with dual coloring: worm in SPICE_ORANGE, dunes in DEEP_DESERT
+    for (i, line) in WORM_BODY.iter().enumerate() {
+        let style = if i >= DUNE_START {
+            theme::dim_style()
+        } else {
+            theme::highlight_style()
+        };
+        lines.push(Line::from(Span::styled(
+            format!("{}{}", pad_str, line),
+            style,
+        )));
     }
+
+    // Title + subtitle, manually centered
+    let title = "M E L A N G E";
+    let subtitle = "\"The memory must flow...\"";
+    let title_pad = (area.width as usize).saturating_sub(title.len()) / 2;
+    let sub_pad = (area.width as usize).saturating_sub(subtitle.len()) / 2;
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "M E L A N G E  v0.1.0",
+        format!("{}{}", " ".repeat(title_pad), title),
         theme::title_style(),
     )));
     lines.push(Line::from(Span::styled(
-        "\"The memory must flow...\"",
+        format!("{}{}", " ".repeat(sub_pad), subtitle),
         theme::dim_style(),
     )));
 
     let splash = Paragraph::new(lines)
-        .alignment(Alignment::Center)
+        .alignment(Alignment::Left)
         .block(
             Block::default()
                 .borders(Borders::NONE)

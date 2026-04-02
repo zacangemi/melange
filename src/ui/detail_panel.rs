@@ -75,16 +75,16 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     // Speed metrics
     lines.push(Line::from(vec![
-        Span::styled("  Prefill:          ", theme::dim_style()),
+        Span::styled("  Prefill:       ", theme::dim_style()),
         Span::styled(
             format!("~{:.0}-{:.0} tok/s", analysis.prefill_tok_s_low, analysis.prefill_tok_s_high),
             theme::highlight_style(),
         ),
-        Span::styled(expert_info, theme::dim_style()),
+        Span::styled(&expert_info, theme::dim_style()),
     ]));
 
     lines.push(Line::from(vec![
-        Span::styled("  Generation:       ", theme::dim_style()),
+        Span::styled("  Generation:    ", theme::dim_style()),
         Span::styled(
             format!("~{:.0}-{:.0} tok/s", analysis.tok_s_low, analysis.tok_s_high),
             theme::highlight_style(),
@@ -92,7 +92,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     ]));
 
     lines.push(Line::from(vec![
-        Span::styled("  Horizon Limit:    ", theme::dim_style()),
+        Span::styled("  Horizon Limit: ", theme::dim_style()),
         Span::styled(&horizon, theme::highlight_style()),
         Span::styled("  (max safe context before swap)", theme::dim_style()),
     ]));
@@ -175,20 +175,34 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     if !warnings.is_empty() {
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled("  Engine Warnings:", theme::title_style()),
+            Span::styled(
+                format!("  Engine Warnings ({}):", warnings.len()),
+                theme::title_style(),
+            ),
+            Span::styled("  press 'w' for detail", theme::dim_style()),
         ]));
 
-        for w in warnings {
+        let max_inline = 3;
+        for w in warnings.iter().take(max_inline) {
             let severity_style = match w.severity {
                 WarningSeverity::Info => theme::dim_style(),
                 WarningSeverity::Caution => theme::highlight_style(),
-                WarningSeverity::Breaking => theme::danger_style(),
+                WarningSeverity::Breaking => theme::highlight_style(),
             };
 
             lines.push(Line::from(vec![
                 Span::styled(format!("    {} ", w.severity.icon()), severity_style),
                 Span::styled(format!("[{}] ", w.engine), theme::dim_style()),
                 Span::styled(&w.summary, severity_style),
+            ]));
+        }
+
+        if warnings.len() > max_inline {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("    ... and {} more (press 'w')", warnings.len() - max_inline),
+                    theme::dim_style(),
+                ),
             ]));
         }
     }

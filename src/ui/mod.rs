@@ -8,6 +8,7 @@ pub mod footer;
 pub mod splash;
 pub mod catalog_panel;
 pub mod help_overlay;
+pub mod warnings_overlay;
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -39,6 +40,24 @@ pub fn draw(f: &mut Frame, app: &App) {
     // Help overlay renders on top of everything
     if app.show_help {
         help_overlay::draw(f);
+    }
+
+    // Warnings overlay renders on top of everything
+    if app.show_warnings {
+        match app.active_tab {
+            DashboardTab::Local => {
+                if !app.models.is_empty() {
+                    let warnings = &app.warnings[app.selected_model];
+                    warnings_overlay::draw(f, &app.models[app.selected_model].name, warnings);
+                }
+            }
+            DashboardTab::Catalog => {
+                if !app.catalog_models.is_empty() {
+                    let warnings = &app.catalog_warnings[app.selected_catalog_model];
+                    warnings_overlay::draw(f, &app.catalog_models[app.selected_catalog_model].name, warnings);
+                }
+            }
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use crate::hardware::HardwareInfo;
 use crate::models::ModelInfo;
-use crate::models::memory_calc::{self, ModelAnalysis};
+use crate::models::memory_calc::{self, FitStatus, ModelAnalysis};
 use crate::dune::quotes;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,12 +32,14 @@ pub struct App {
     pub should_quit: bool,
     pub vpn_visible: bool,
     pub show_help: bool,
+    pub show_warnings: bool,
     pub vpn_preference: Option<String>,
     pub catalog_models: Vec<ModelInfo>,
     pub catalog_analyses: Vec<ModelAnalysis>,
     pub selected_catalog_model: usize,
     pub compat_db: crate::compat::warnings::CompatDb,
     pub warnings: Vec<Vec<crate::compat::warnings::CompatWarning>>,
+    pub catalog_warnings: Vec<Vec<crate::compat::warnings::CompatWarning>>,
 }
 
 impl App {
@@ -58,11 +60,43 @@ impl App {
             })
             .collect();
 
+        // Sort local models: Fits → Tight → Limited → OOM, then by size descending
+        let mut sort_indices: Vec<usize> = (0..models.len()).collect();
+        sort_indices.sort_by(|&a, &b| {
+            let status_ord = |s: &FitStatus| -> u8 {
+                match s {
+                    FitStatus::Fits => 0,
+                    FitStatus::Tight => 1,
+                    FitStatus::Limited => 2,
+                    FitStatus::OOM => 3,
+                }
+            };
+            let sa = status_ord(&analyses[a].status);
+            let sb = status_ord(&analyses[b].status);
+            sa.cmp(&sb).then_with(|| {
+                // Within same tier, largest model first
+                models[b].total_size_bytes.cmp(&models[a].total_size_bytes)
+            })
+        });
+        let models: Vec<ModelInfo> = sort_indices.iter().map(|&i| models[i].clone()).collect();
+        let analyses: Vec<ModelAnalysis> = sort_indices.iter().map(|&i| analyses[i].clone()).collect();
+        let warnings: Vec<Vec<crate::compat::warnings::CompatWarning>> = sort_indices.iter().map(|&i| warnings[i].clone()).collect();
+
         // Build catalog with analysis against real hardware
         let catalog_models = crate::models::catalog::catalog_models();
         let catalog_analyses: Vec<ModelAnalysis> = catalog_models
             .iter()
             .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.wired_bytes))
+            .collect();
+
+        let catalog_warnings: Vec<Vec<crate::compat::warnings::CompatWarning>> = catalog_models
+            .iter()
+            .map(|m| {
+                crate::compat::warnings::find_warnings(&compat_db, m, &hardware.engines)
+                    .into_iter()
+                    .cloned()
+                    .collect()
+            })
             .collect();
 
         let now = Instant::now();
@@ -81,12 +115,14 @@ impl App {
             should_quit: false,
             vpn_visible: false,
             show_help: false,
+            show_warnings: false,
             vpn_preference,
             catalog_models,
             catalog_analyses,
             selected_catalog_model: 0,
             compat_db,
             warnings,
+            catalog_warnings,
         }
     }
 
@@ -105,6 +141,12 @@ impl App {
 
     pub fn on_key(&mut self, key: crossterm::event::KeyCode) {
         use crossterm::event::KeyCode;
+
+        // Any key dismisses the warnings overlay
+        if self.show_warnings {
+            self.show_warnings = false;
+            return;
+        }
 
         // Any key dismisses the help overlay
         if self.show_help {
@@ -164,6 +206,24 @@ impl App {
             KeyCode::Char('v') => {
                 self.vpn_visible = !self.vpn_visible;
             }
+            KeyCode::Char('w') => {
+                match self.active_tab {
+                    DashboardTab::Local => {
+                        if !self.models.is_empty()
+                            && !self.warnings[self.selected_model].is_empty()
+                        {
+                            self.show_warnings = true;
+                        }
+                    }
+                    DashboardTab::Catalog => {
+                        if !self.catalog_models.is_empty()
+                            && !self.catalog_warnings[self.selected_catalog_model].is_empty()
+                        {
+                            self.show_warnings = true;
+                        }
+                    }
+                }
+            }
             KeyCode::Char('?') => {
                 self.show_help = true;
             }
@@ -195,7 +255,26 @@ impl App {
                     .collect()
             })
             .collect();
-        self.models = models;
+        // Sort local models: Fits → Tight → Limited → OOM, then size descending
+        let mut sort_indices: Vec<usize> = (0..models.len()).collect();
+        sort_indices.sort_by(|&a, &b| {
+            let status_ord = |s: &FitStatus| -> u8 {
+                match s {
+                    FitStatus::Fits => 0,
+                    FitStatus::Tight => 1,
+                    FitStatus::Limited => 2,
+                    FitStatus::OOM => 3,
+                }
+            };
+            let sa = status_ord(&self.analyses[a].status);
+            let sb = status_ord(&self.analyses[b].status);
+            sa.cmp(&sb).then_with(|| {
+                models[b].total_size_bytes.cmp(&models[a].total_size_bytes)
+            })
+        });
+        self.models = sort_indices.iter().map(|&i| models[i].clone()).collect();
+        self.analyses = sort_indices.iter().map(|&i| self.analyses[i].clone()).collect();
+        self.warnings = sort_indices.iter().map(|&i| self.warnings[i].clone()).collect();
         if self.selected_model >= self.models.len() {
             self.selected_model = 0;
         }
@@ -205,6 +284,17 @@ impl App {
             .iter()
             .map(|m| {
                 memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.wired_bytes)
+            })
+            .collect();
+
+        // Recompute catalog warnings
+        self.catalog_warnings = self.catalog_models
+            .iter()
+            .map(|m| {
+                crate::compat::warnings::find_warnings(&self.compat_db, m, &self.hardware.engines)
+                    .into_iter()
+                    .cloned()
+                    .collect()
             })
             .collect();
     }

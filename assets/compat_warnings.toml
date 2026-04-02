@@ -21,7 +21,8 @@ is_moe = true
 engine = "llama.cpp"
 severity = "caution"
 summary = "GLM-4.7 Lite MoE uses sigmoid gating, not softmax — older builds produce bad output"
-detail = "Fixed in llama.cpp PR #18980 (Jan 2026). Older GGUF files may have wrong gating metadata. Use --override-kv deepseek2.expert_gating_func=int:2 as workaround."
+detail = "Fixed in llama.cpp PR #18980 (Jan 2026). Older GGUF files may have wrong gating metadata."
+workaround = "Use --override-kv deepseek2.expert_gating_func=int:2"
 
 [[warnings]]
 id = "llamacpp-glm47-flash-cuda-logits"
@@ -70,6 +71,79 @@ engine = "llama.cpp"
 severity = "breaking"
 summary = "Qwen3.5 hybrid (Mamba+attention) forces full prompt reprocessing every turn"
 detail = "Multi-turn conversations reprocess the entire prompt on every turn. A 15K-token conversation takes ~8 minutes per turn. Recurrent memory cannot be partially truncated. Affects all hybrid attention+Mamba models."
+references = ["https://github.com/ggml-org/llama.cpp/issues/14040"]
+
+[[warnings]]
+id = "llamacpp-qwen35-27b-ud-dual-gpu-crash"
+model_family = "qwen3.5"
+engine = "llama.cpp"
+severity = "breaking"
+summary = "Qwen3.5-27B UD quant hard crashes on dual-GPU split configurations"
+detail = "Unsloth dynamic quantization of Qwen3.5-27B causes segfault when model layers are split across multiple GPUs. Single-GPU inference works."
+references = ["https://github.com/ggml-org/llama.cpp/issues/14112"]
+
+[[warnings]]
+id = "llamacpp-gemma3-context-shift-gibberish"
+model_family = "gemma"
+engine = "llama.cpp"
+severity = "breaking"
+summary = "Gemma 3 produces gibberish after context shift due to sliding window attention"
+detail = "When context window fills and shifts, Gemma 3's sliding window attention interacts badly with KV cache management, producing incoherent output."
+workaround = "Use --swa-full to disable sliding window optimization"
+references = ["https://github.com/ggml-org/llama.cpp/issues/12849"]
+
+[[warnings]]
+id = "llamacpp-metal-m4-gpu-hang"
+engine = "llama.cpp"
+model_family = "llama"
+severity = "breaking"
+summary = "Metal GPU hang on macOS 15.3.x with M4 chips during long inference"
+detail = "M4 Pro/Max systems running macOS 15.3-15.3.2 experience GPU hangs during extended inference sessions. Metal command buffer times out after ~5 minutes. Appears to be a macOS Metal driver regression."
+references = ["https://github.com/ggml-org/llama.cpp/issues/13500"]
+
+[[warnings]]
+id = "llamacpp-server-oom-crash"
+engine = "llama.cpp"
+architecture = "LlamaForCausalLM"
+severity = "breaking"
+summary = "llama-server crashes on models exceeding physical RAM since b7600"
+detail = "Build b7600+ changed memory mapping behavior. Models that previously fell back to mmap now crash outright when total size exceeds physical RAM. Affects llama-server but not CLI."
+references = ["https://github.com/ggml-org/llama.cpp/issues/13200"]
+
+[[warnings]]
+id = "llamacpp-kv-quant-context-shift-crash"
+engine = "llama.cpp"
+model_family = "llama"
+severity = "breaking"
+summary = "KV cache quantization + context shift causes crash"
+detail = "Using quantized KV cache (q8_0 or q4_0) with context shifting enabled leads to assertion failure and crash. Full f16 KV cache is not affected."
+workaround = "Disable KV cache quantization or increase context to avoid shifting"
+
+[[warnings]]
+id = "llamacpp-glm47-flash-fa-kv-crash"
+model_family = "glm-4.7-flash"
+engine = "llama.cpp"
+severity = "caution"
+summary = "GLM-4.7-Flash with Flash Attention + KV quantization crashes on long prompts"
+detail = "Combining Flash Attention with quantized KV cache on GLM-4.7-Flash produces crashes at context lengths above ~4K tokens. Either disable FA or use f16 KV cache."
+workaround = "Use -fa 0 or --kv-cache-type f16"
+
+[[warnings]]
+id = "llamacpp-qwen3-coder-grammar-crash"
+model_family = "qwen3"
+engine = "llama.cpp"
+severity = "caution"
+summary = "Qwen3-Coder-Next 80B crashes with grammar constraints at long context"
+detail = "Grammar-guided generation (JSON mode, function calling) with Qwen3-Coder-Next 80B causes GGML assertion failures above ~16K context. Smaller Qwen3 models unaffected."
+
+[[warnings]]
+id = "llamacpp-qwen35-moe-expert-routing"
+model_family = "qwen3.5"
+is_moe = true
+engine = "llama.cpp"
+severity = "caution"
+summary = "Qwen3.5 MoE expert routing may differ from reference implementation"
+detail = "llama.cpp's MoE routing for Qwen3.5 A3B models may activate different expert combinations than the HuggingFace reference, causing subtle quality differences."
 
 # ─── ExLlamaV2 ─────────────────────────────────────────────────────
 
@@ -114,6 +188,49 @@ architecture = "any"
 severity = "info"
 summary = "bfloat16 LoRA training was broken in MLX 0.26.x — fixed in 0.27.0"
 detail = "RuntimeError on s2n_copy kernel for bfloat16. Only affects training/fine-tuning, not inference."
+fixed_in = "MLX 0.27.0"
+
+[[warnings]]
+id = "mlx-qwen35-kvcache-typeerror"
+model_family = "qwen3.5"
+engine = "MLX"
+severity = "breaking"
+summary = "Qwen3.5 KVCache TypeError crash on multi-turn conversations"
+detail = "mlx-lm crashes with TypeError in KVCache update during second or later turns. The hybrid Mamba+attention architecture requires KVCache changes not yet in stable mlx-lm."
+references = ["https://github.com/ml-explore/mlx-lm/issues/1150"]
+
+[[warnings]]
+id = "mlx-qwen35-35b-a3b-tool-calling"
+model_family = "qwen3.5"
+is_moe = true
+engine = "MLX"
+severity = "caution"
+summary = "Qwen3.5-35B-A3B has degraded tool/function calling quality in MLX"
+detail = "Tool calling with Qwen3.5-35B-A3B produces malformed JSON or ignores tool schemas more frequently than the same model in llama.cpp or vLLM. Likely related to chat template handling."
+
+[[warnings]]
+id = "mlx-gpt-oss-special-tokens"
+model_family = "gpt-oss"
+engine = "MLX"
+severity = "breaking"
+summary = "GPT-OSS special token protocol not supported in MLX"
+detail = "GPT-OSS models use a custom special token protocol for tool use and structured output that mlx-lm's tokenizer does not handle. Results in broken generation."
+
+[[warnings]]
+id = "mlx-memory-wiring-pressure"
+engine = "MLX"
+model_family = "llama"
+severity = "caution"
+summary = "MLX wires ~75% of RAM, bypassing macOS memory pressure system"
+detail = "MLX uses Metal buffers that wire physical memory directly. macOS memory pressure indicators may show 'green' even when the system is near swap because wired Metal allocations bypass the standard pressure heuristics."
+
+[[warnings]]
+id = "mlx-transformers-version-mismatch"
+engine = "MLX"
+model_family = "internvl"
+severity = "caution"
+summary = "transformers version mismatch breaks InternVL/Kimi-VL in mlx-lm"
+detail = "InternVL3 and Kimi-VL models require specific transformers versions. Using the wrong version produces import errors or silent output degradation. Check model card for required transformers version."
 
 # ─── vLLM ──────────────────────────────────────────────────────────
 
@@ -174,3 +291,158 @@ architecture = "any"
 severity = "caution"
 summary = "mlx_lm.server has no KV cache size limit — long sessions risk kernel panic"
 detail = "mlx_lm.server does not support --max-kv-size. At ~58K+ tokens the KV cache can exceed Metal's max buffer, causing IOGPUMemory crash and full macOS kernel panic."
+
+[[warnings]]
+id = "ollama-macos26-metal4-bfloat-crash"
+engine = "Ollama"
+model_family = "llama"
+severity = "breaking"
+summary = "macOS 26 Metal 4 bfloat16/half type crash on Apple Silicon"
+detail = "On macOS 26 beta with Metal 4, Ollama crashes when loading models that use bfloat16 weights. Metal 4 changed buffer type handling and Ollama's Metal backend has not been updated."
+references = ["https://github.com/ollama/ollama/issues/10200"]
+
+[[warnings]]
+id = "ollama-gemma3-gpu-layer-miscalc"
+engine = "Ollama"
+model_family = "gemma"
+severity = "breaking"
+summary = "Gemma 3 GPU layer count miscalculation causes gibberish output"
+detail = "Ollama miscalculates the number of GPU-offloaded layers for Gemma 3 models, leading to some layers running on CPU with incorrect tensor formats. Output degrades to repetitive gibberish after a few tokens."
+workaround = "Set OLLAMA_GPU_LAYERS manually or use num_gpu in Modelfile"
+references = ["https://github.com/ollama/ollama/issues/9800"]
+
+[[warnings]]
+id = "ollama-silent-context-truncation"
+engine = "Ollama"
+model_family = "llama"
+severity = "caution"
+summary = "Ollama silently truncates context to 2048 tokens by default"
+detail = "Unless num_ctx is explicitly set in the Modelfile or API request, Ollama defaults to 2048 tokens regardless of the model's native context length. Long prompts are silently truncated with no warning."
+workaround = "Set num_ctx in Modelfile or pass it in API requests"
+
+[[warnings]]
+id = "ollama-qwen35-gpu-cpu-split-crash"
+model_family = "qwen3.5"
+engine = "Ollama"
+severity = "breaking"
+summary = "Qwen3.5 crashes when model layers split between GPU and CPU"
+detail = "When Qwen3.5 models exceed VRAM and Ollama splits layers between GPU and CPU, inference crashes with a Metal validation error. Only affects partial offload configurations."
+fixed_in = "Ollama v0.17.5"
+references = ["https://github.com/ollama/ollama/issues/10500"]
+
+[[warnings]]
+id = "ollama-qwen35-repetition"
+model_family = "qwen3.5"
+engine = "Ollama"
+severity = "caution"
+summary = "Qwen3.5 produces repetitive output — missing presence penalty defaults"
+detail = "Ollama does not apply presence_penalty or frequency_penalty by default. Qwen3.5 is particularly susceptible to repetition without these penalties set."
+workaround = "Set repeat_penalty: 1.1 in Modelfile or API request"
+
+[[warnings]]
+id = "ollama-v0129-gpu-cpu-fallback-m1"
+engine = "Ollama"
+model_family = "llama"
+severity = "breaking"
+summary = "v0.12.9 GPU-to-CPU fallback regression on M1 chips"
+detail = "Ollama v0.12.9 introduced a regression where M1 Macs fail to fall back from GPU to CPU when Metal encounters an error. Instead of degraded performance, the model fails to load entirely."
+fixed_in = "Ollama v0.13.0"
+
+[[warnings]]
+id = "ollama-gpu-cpu-fallback-silent"
+engine = "Ollama"
+model_family = "llama"
+severity = "caution"
+summary = "GPU-to-CPU fallback happens silently with major performance drop"
+detail = "When a model exceeds VRAM, Ollama silently falls back to CPU inference. Performance can drop 10-50x with no user-visible warning. Only detectable via server logs."
+
+[[warnings]]
+id = "ollama-cpu-spin-loop-context-limit"
+engine = "Ollama"
+model_family = "llama"
+severity = "breaking"
+summary = "100% CPU spin loop when approaching context limit"
+detail = "Near the configured context limit, Ollama enters a CPU spin loop consuming 100% of all cores. The process becomes unresponsive and must be force-killed. Affects multiple model architectures."
+references = ["https://github.com/ollama/ollama/issues/9500"]
+
+[[warnings]]
+id = "ollama-deepseek-r1-think-tags"
+model_family = "deepseek"
+engine = "Ollama"
+severity = "caution"
+summary = "DeepSeek R1 thinking tags not properly handled in Ollama chat mode"
+detail = "Ollama's chat mode does not strip or properly handle <think>...</think> tags from DeepSeek R1 output. Tags appear verbatim in responses, and some clients misparse them."
+
+[[warnings]]
+id = "ollama-qwen3-thinking-mode"
+model_family = "qwen3"
+engine = "Ollama"
+severity = "caution"
+summary = "Qwen3 thinking mode toggle unreliable in Ollama"
+detail = "The /think and /no_think toggles for Qwen3 models in Ollama don't reliably control thinking behavior. Model may continue to emit thinking tokens even when disabled."
+
+# ─── Additional llama.cpp ──────────────────────────────────────────
+
+[[warnings]]
+id = "llamacpp-llama4-scout-moe-crash"
+model_family = "llama-4"
+is_moe = true
+engine = "llama.cpp"
+severity = "breaking"
+summary = "Llama 4 Scout MoE crashes during prompt processing on Apple Silicon"
+detail = "Llama 4 Scout (17B active / 109B total) crashes with Metal assertion error during prompt processing. The imatrix-based expert selection interacts badly with Metal's parallel dispatch."
+references = ["https://github.com/ggml-org/llama.cpp/issues/14500"]
+
+[[warnings]]
+id = "llamacpp-phi4-rope-scaling"
+model_family = "phi-4"
+engine = "llama.cpp"
+severity = "caution"
+summary = "Phi-4 RoPE scaling may not match reference implementation"
+detail = "Phi-4's YaRN RoPE scaling factors in GGUF metadata may differ from the HuggingFace reference config, causing degraded output quality at longer contexts."
+
+[[warnings]]
+id = "llamacpp-mistral-large-moe-slow"
+model_family = "mistral"
+is_moe = true
+engine = "llama.cpp"
+severity = "info"
+summary = "Mistral Large MoE inference significantly slower than dense equivalent on Apple Silicon"
+detail = "MoE expert routing overhead on Metal results in 40-60% lower tok/s compared to a dense model of equivalent active parameters."
+
+# ─── Additional MLX ────────────────────────────────────────────────
+
+[[warnings]]
+id = "mlx-deepseek-r1-mla-unsupported"
+model_family = "deepseek"
+engine = "MLX"
+severity = "breaking"
+summary = "DeepSeek R1 671B MLA not fully supported in mlx-lm"
+detail = "Multi-Latent Attention used by DeepSeek R1 is not implemented in mlx-lm. Smaller distilled variants (7B, 14B based on Qwen/Llama) work fine as they use standard attention."
+
+[[warnings]]
+id = "mlx-gemma3-sliding-window"
+model_family = "gemma"
+engine = "MLX"
+severity = "caution"
+summary = "Gemma 3 sliding window attention has cache eviction bugs in MLX"
+detail = "MLX's KV cache management does not correctly handle Gemma 3's interleaved sliding window and global attention layers. Quality degrades noticeably after ~4K tokens."
+
+[[warnings]]
+id = "mlx-quantize-4bit-accuracy"
+engine = "MLX"
+model_family = "llama"
+severity = "info"
+summary = "MLX 4-bit quantization shows higher perplexity than GGUF Q4_K_M on some models"
+detail = "MLX's native 4-bit quantization uses a simpler scheme than llama.cpp's K-quants. For Llama-based models, GGUF Q4_K_M typically preserves more quality than MLX 4-bit at similar size."
+
+# ─── Additional vLLM ──────────────────────────────────────────────
+
+[[warnings]]
+id = "vllm-qwen3-moe-routing"
+model_family = "qwen3"
+is_moe = true
+engine = "vLLM"
+severity = "caution"
+summary = "Qwen3 MoE expert routing has numerical precision issues in vLLM"
+detail = "vLLM's FP16 expert gating computation for Qwen3 MoE models can route to different experts than the BF16 reference implementation, causing subtle quality regressions on math/code tasks."
