@@ -31,6 +31,22 @@ use models::memory_calc;
 #[derive(Parser, Debug)]
 #[command(name = "melange", version = "0.1.0")]
 #[command(about = "The memory must flow — local model memory analyzer for Apple Silicon")]
+#[command(after_help = "\
+KEYBINDINGS (TUI):
+  q / Esc      Quit
+  j / k        Navigate models (down / up)
+  Tab          Switch between Local and Catalog views
+  r            Refresh hardware detection and model scan
+  v            Toggle VPN IP visibility (masked ↔ revealed)
+  ?            Show keybinding help overlay
+
+CONFIGURATION:
+  ~/.config/melange/config.toml
+
+  model_dirs = [\"/path/to/models\"]
+  vpn = \"tailscale\"              # optional: lock VPN detection to a provider
+                                  # auto-detects if omitted (tailscale → zerotier → nebula → wireguard)
+")]
 struct Cli {
     /// Scan a specific directory (one-time override, not saved)
     #[arg(long = "scan", value_name = "PATH")]
@@ -115,8 +131,12 @@ fn main() -> Result<()> {
 
     let model_dirs = resolve_model_dirs(cli.scan)?;
 
+    // Load config for VPN preference
+    let cfg = config::load_config_or_default()?;
+    let vpn_pref = cfg.vpn.as_deref();
+
     // Detect hardware
-    let hardware = HardwareInfo::detect()?;
+    let hardware = HardwareInfo::detect(vpn_pref)?;
 
     // Scan all model directories
     let found_models = models::scanner::scan_directories(&model_dirs);
@@ -126,7 +146,7 @@ fn main() -> Result<()> {
     }
 
     // Launch TUI
-    run_tui(hardware, found_models, model_dirs)
+    run_tui(hardware, found_models, model_dirs, cfg.vpn)
 }
 
 /// Resolve model directories with priority:
@@ -153,6 +173,7 @@ fn resolve_model_dirs(cli_override: Option<PathBuf>) -> Result<Vec<PathBuf>> {
     if default_dir.exists() && default_dir.is_dir() {
         let cfg = config::MelangeConfig {
             model_dirs: vec![default_dir.to_string_lossy().to_string()],
+            vpn: None,
         };
         config::save_config(&cfg)?;
         return Ok(vec![default_dir]);
@@ -209,7 +230,7 @@ fn output_json(hardware: &HardwareInfo, models: &[models::ModelInfo]) -> Result<
     Ok(())
 }
 
-fn run_tui(hardware: HardwareInfo, models: Vec<models::ModelInfo>, model_dirs: Vec<PathBuf>) -> Result<()> {
+fn run_tui(hardware: HardwareInfo, models: Vec<models::ModelInfo>, model_dirs: Vec<PathBuf>, vpn_preference: Option<String>) -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -217,7 +238,7 @@ fn run_tui(hardware: HardwareInfo, models: Vec<models::ModelInfo>, model_dirs: V
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(hardware, models, model_dirs);
+    let mut app = App::new(hardware, models, model_dirs, vpn_preference);
 
     // Main event loop
     loop {

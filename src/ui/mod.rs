@@ -7,6 +7,7 @@ pub mod detail_panel;
 pub mod footer;
 pub mod splash;
 pub mod catalog_panel;
+pub mod help_overlay;
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -34,6 +35,11 @@ pub fn draw(f: &mut Frame, app: &App) {
     }
 
     footer::draw(f, app, chunks[2]);
+
+    // Help overlay renders on top of everything
+    if app.show_help {
+        help_overlay::draw(f);
+    }
 }
 
 fn draw_local_body(f: &mut Frame, app: &App, area: Rect) {

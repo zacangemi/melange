@@ -60,20 +60,13 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("  Engines:   ", theme::dim_style()),
             Span::styled(hw.engines.display(), theme::text_style()),
         ]),
-        Line::from({
-            let vpn_text = hw.vpn.display(app.vpn_visible);
-            let vpn_style = if hw.vpn.active { theme::safe_style() } else { theme::dim_style() };
-            let mut spans = vec![
-                Span::styled("  VPN:       ", theme::dim_style()),
-                Span::styled(vpn_text, vpn_style),
-            ];
-            if hw.vpn.active && !app.vpn_visible {
-                spans.push(Span::styled("  [v] reveal", theme::dim_style()));
-            } else if hw.vpn.active {
-                spans.push(Span::styled("  [v] hide", theme::dim_style()));
-            }
-            spans
-        }),
+        Line::from(vec![
+            Span::styled("  VPN:       ", theme::dim_style()),
+            Span::styled(
+                hw.vpn.display(app.vpn_visible),
+                if hw.vpn.active { theme::safe_style() } else { theme::dim_style() },
+            ),
+        ]),
     ];
 
     let panel = Paragraph::new(lines).block(

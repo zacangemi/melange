@@ -31,12 +31,14 @@ pub struct App {
     pub last_quote_change: Instant,
     pub should_quit: bool,
     pub vpn_visible: bool,
+    pub show_help: bool,
+    pub vpn_preference: Option<String>,
     pub compat_db: crate::compat::warnings::CompatDb,
     pub warnings: Vec<Vec<crate::compat::warnings::CompatWarning>>,
 }
 
 impl App {
-    pub fn new(hardware: HardwareInfo, models: Vec<ModelInfo>, model_dirs: Vec<PathBuf>) -> Self {
+    pub fn new(hardware: HardwareInfo, models: Vec<ModelInfo>, model_dirs: Vec<PathBuf>, vpn_preference: Option<String>) -> Self {
         let analyses: Vec<ModelAnalysis> = models
             .iter()
             .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs))
@@ -68,6 +70,8 @@ impl App {
             last_quote_change: now,
             should_quit: false,
             vpn_visible: false,
+            show_help: false,
+            vpn_preference,
             compat_db,
             warnings,
         }
@@ -88,6 +92,12 @@ impl App {
 
     pub fn on_key(&mut self, key: crossterm::event::KeyCode) {
         use crossterm::event::KeyCode;
+
+        // Any key dismisses the help overlay
+        if self.show_help {
+            self.show_help = false;
+            return;
+        }
 
         match key {
             KeyCode::Char('q') | KeyCode::Esc => {
@@ -119,13 +129,16 @@ impl App {
             KeyCode::Char('v') => {
                 self.vpn_visible = !self.vpn_visible;
             }
+            KeyCode::Char('?') => {
+                self.show_help = true;
+            }
             _ => {}
         }
     }
 
     pub fn refresh(&mut self) {
-        // Re-detect hardware
-        if let Ok(hw) = HardwareInfo::detect() {
+        // Re-detect hardware (respecting VPN config preference)
+        if let Ok(hw) = HardwareInfo::detect(self.vpn_preference.as_deref()) {
             self.hardware = hw;
         }
         // Re-scan all model directories

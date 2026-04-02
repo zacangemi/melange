@@ -10,6 +10,11 @@ use crate::models;
 pub struct MelangeConfig {
     #[serde(default)]
     pub model_dirs: Vec<String>,
+    /// Optional: lock VPN detection to a specific provider.
+    /// Values: "tailscale", "zerotier", "nebula", "wireguard"
+    /// If unset, auto-detects in priority order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vpn: Option<String>,
 }
 
 /// Returns `~/.config/melange/config.toml`
@@ -34,7 +39,7 @@ pub fn load_config() -> Result<Option<MelangeConfig>> {
 
 /// Load config or return empty default.
 pub fn load_config_or_default() -> Result<MelangeConfig> {
-    Ok(load_config()?.unwrap_or(MelangeConfig { model_dirs: vec![] }))
+    Ok(load_config()?.unwrap_or(MelangeConfig { model_dirs: vec![], vpn: None }))
 }
 
 /// Save config to disk, creating parent dirs as needed.
@@ -149,6 +154,7 @@ pub fn first_run_setup() -> Result<Vec<PathBuf>> {
 
     let cfg = MelangeConfig {
         model_dirs: vec![model_dir.to_string_lossy().to_string()],
+        vpn: None,
     };
     save_config(&cfg)?;
 

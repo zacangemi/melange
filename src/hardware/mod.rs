@@ -23,7 +23,7 @@ pub struct HardwareInfo {
 }
 
 impl HardwareInfo {
-    pub fn detect() -> Result<Self> {
+    pub fn detect(vpn_pref: Option<&str>) -> Result<Self> {
         let os = os_info::detect()?;
         let cpu = cpu::detect()?;
         let memory = memory::detect()?;
@@ -31,7 +31,7 @@ impl HardwareInfo {
         let disk = disk::detect()?;
         let bandwidth_gbs = bandwidth::lookup(&cpu.brand);
         let engines = engines::detect();
-        let vpn = vpn::detect();
+        let vpn = vpn::detect(vpn_pref);
 
         Ok(Self {
             os,
