@@ -187,7 +187,7 @@ fn output_json(hardware: &HardwareInfo, models: &[models::ModelInfo]) -> Result<
     let entries: Vec<JsonModelEntry> = models
         .iter()
         .map(|m| {
-            let analysis = memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs);
+            let analysis = memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.used_bytes);
 
             JsonModelEntry {
                 name: m.name.clone(),

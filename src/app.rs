@@ -33,6 +33,9 @@ pub struct App {
     pub vpn_visible: bool,
     pub show_help: bool,
     pub vpn_preference: Option<String>,
+    pub catalog_models: Vec<ModelInfo>,
+    pub catalog_analyses: Vec<ModelAnalysis>,
+    pub selected_catalog_model: usize,
     pub compat_db: crate::compat::warnings::CompatDb,
     pub warnings: Vec<Vec<crate::compat::warnings::CompatWarning>>,
 }
@@ -41,7 +44,7 @@ impl App {
     pub fn new(hardware: HardwareInfo, models: Vec<ModelInfo>, model_dirs: Vec<PathBuf>, vpn_preference: Option<String>) -> Self {
         let analyses: Vec<ModelAnalysis> = models
             .iter()
-            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs))
+            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.used_bytes))
             .collect();
 
         let compat_db = crate::compat::warnings::load_compat_db();
@@ -53,6 +56,13 @@ impl App {
                     .cloned()
                     .collect()
             })
+            .collect();
+
+        // Build catalog with analysis against real hardware
+        let catalog_models = crate::models::catalog::catalog_models();
+        let catalog_analyses: Vec<ModelAnalysis> = catalog_models
+            .iter()
+            .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs, hardware.memory.used_bytes))
             .collect();
 
         let now = Instant::now();
@@ -72,6 +82,9 @@ impl App {
             vpn_visible: false,
             show_help: false,
             vpn_preference,
+            catalog_models,
+            catalog_analyses,
+            selected_catalog_model: 0,
             compat_db,
             warnings,
         }
@@ -104,17 +117,39 @@ impl App {
                 self.should_quit = true;
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                if !self.models.is_empty() {
-                    self.selected_model = (self.selected_model + 1) % self.models.len();
+                match self.active_tab {
+                    DashboardTab::Local => {
+                        if !self.models.is_empty() {
+                            self.selected_model = (self.selected_model + 1) % self.models.len();
+                        }
+                    }
+                    DashboardTab::Catalog => {
+                        if !self.catalog_models.is_empty() {
+                            self.selected_catalog_model = (self.selected_catalog_model + 1) % self.catalog_models.len();
+                        }
+                    }
                 }
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                if !self.models.is_empty() {
-                    self.selected_model = if self.selected_model == 0 {
-                        self.models.len() - 1
-                    } else {
-                        self.selected_model - 1
-                    };
+                match self.active_tab {
+                    DashboardTab::Local => {
+                        if !self.models.is_empty() {
+                            self.selected_model = if self.selected_model == 0 {
+                                self.models.len() - 1
+                            } else {
+                                self.selected_model - 1
+                            };
+                        }
+                    }
+                    DashboardTab::Catalog => {
+                        if !self.catalog_models.is_empty() {
+                            self.selected_catalog_model = if self.selected_catalog_model == 0 {
+                                self.catalog_models.len() - 1
+                            } else {
+                                self.selected_catalog_model - 1
+                            };
+                        }
+                    }
                 }
             }
             KeyCode::Tab => {
@@ -146,7 +181,7 @@ impl App {
         self.analyses = models
             .iter()
             .map(|m| {
-                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs)
+                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.used_bytes)
             })
             .collect();
         // Recompute compatibility warnings
@@ -164,5 +199,13 @@ impl App {
         if self.selected_model >= self.models.len() {
             self.selected_model = 0;
         }
+
+        // Recompute catalog analyses against fresh hardware
+        self.catalog_analyses = self.catalog_models
+            .iter()
+            .map(|m| {
+                memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs, self.hardware.memory.used_bytes)
+            })
+            .collect();
     }
 }

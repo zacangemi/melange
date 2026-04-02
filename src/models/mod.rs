@@ -2,6 +2,7 @@ pub mod scanner;
 pub mod config_parser;
 pub mod index_parser;
 pub mod memory_calc;
+pub mod catalog;
 
 use serde::Serialize;
 

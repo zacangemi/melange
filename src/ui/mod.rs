@@ -47,7 +47,7 @@ fn draw_local_body(f: &mut Frame, app: &App, area: Rect) {
     let body = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(12),  // Hardware + Memory row
+            Constraint::Length(13),  // Hardware + Memory row (with top processes)
             Constraint::Min(6),      // Models table + detail
         ])
         .split(area);

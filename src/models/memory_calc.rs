@@ -1,7 +1,7 @@
 use serde::Serialize;
 use super::ModelInfo;
 
-const OS_RESERVED_BYTES: u64 = 3_758_096_384; // 3.5 GB
+const MIN_OS_RESERVED_BYTES: u64 = 2_684_354_560; // 2.5 GB floor — OS always needs at least this
 const RUNTIME_OVERHEAD_FRACTION: f64 = 0.10;
 const BUFFER_BYTES: u64 = 1_073_741_824; // 1 GB safety buffer
 
@@ -99,7 +99,7 @@ pub fn kv_per_token(model: &ModelInfo) -> u64 {
 }
 
 /// Estimate memory usage at a specific context length
-pub fn estimate_at_context(model: &ModelInfo, context_len: u64) -> MemoryEstimate {
+pub fn estimate_at_context(model: &ModelInfo, context_len: u64, os_used_bytes: u64) -> MemoryEstimate {
     let weight_bytes = model.total_size_bytes;
     let kv_bytes = kv_per_token(model) * context_len;
     let overhead_bytes = (weight_bytes as f64 * RUNTIME_OVERHEAD_FRACTION) as u64;
@@ -108,15 +108,15 @@ pub fn estimate_at_context(model: &ModelInfo, context_len: u64) -> MemoryEstimat
         weight_bytes,
         kv_cache_bytes: kv_bytes,
         overhead_bytes,
-        os_reserved_bytes: OS_RESERVED_BYTES,
-        total_bytes: weight_bytes + kv_bytes + overhead_bytes + OS_RESERVED_BYTES,
+        os_reserved_bytes: os_used_bytes,
+        total_bytes: weight_bytes + kv_bytes + overhead_bytes + os_used_bytes,
         context_length: context_len,
     }
 }
 
 /// Maximum safe context length before hitting swap
-pub fn max_safe_context(model: &ModelInfo, total_ram_bytes: u64) -> u64 {
-    let available = total_ram_bytes.saturating_sub(OS_RESERVED_BYTES);
+pub fn max_safe_context(model: &ModelInfo, total_ram_bytes: u64, os_used_bytes: u64) -> u64 {
+    let available = total_ram_bytes.saturating_sub(os_used_bytes);
     let weight_bytes = model.total_size_bytes;
     let overhead = (weight_bytes as f64 * RUNTIME_OVERHEAD_FRACTION) as u64;
 
@@ -160,22 +160,26 @@ pub fn estimate_prefill_tok_s(model: &ModelInfo, bandwidth_gbs: f64) -> (f64, f6
     (decode_low * 10.0, decode_high * 20.0)
 }
 
-/// Full analysis of a model against specific hardware
-pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64) -> ModelAnalysis {
+/// Full analysis of a model against specific hardware.
+/// `os_used_bytes` is the current non-model memory usage (OS + apps).
+pub fn analyze(model: &ModelInfo, total_ram_bytes: u64, bandwidth_gbs: f64, os_used_bytes: u64) -> ModelAnalysis {
+    // Use actual OS usage, but never less than 2.5 GB floor
+    let os_reserved = os_used_bytes.max(MIN_OS_RESERVED_BYTES);
+
     let context_lengths = [4096, 8192, 16384, 32768, 65536, 131072];
 
     let estimates: Vec<MemoryEstimate> = context_lengths
         .iter()
         .filter(|&&ctx| ctx <= model.max_position_embeddings)
-        .map(|&ctx| estimate_at_context(model, ctx))
+        .map(|&ctx| estimate_at_context(model, ctx, os_reserved))
         .collect();
 
-    let max_ctx = max_safe_context(model, total_ram_bytes);
+    let max_ctx = max_safe_context(model, total_ram_bytes, os_reserved);
     let (tok_s_low, tok_s_high) = estimate_tok_s(model, bandwidth_gbs);
     let (prefill_low, prefill_high) = estimate_prefill_tok_s(model, bandwidth_gbs);
 
     // Headroom at 4K context
-    let est_4k = estimate_at_context(model, 4096);
+    let est_4k = estimate_at_context(model, 4096, os_reserved);
     let headroom = total_ram_bytes as i64 - est_4k.total_bytes as i64;
 
     // Classify considering both headroom and practical usability

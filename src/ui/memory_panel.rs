@@ -25,7 +25,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
 
-    let lines = vec![
+    let mut lines = vec![
         Line::from(vec![
             Span::styled("  ", theme::text_style()),
             Span::styled(&bar, ratatui::style::Style::default().fg(gauge_color)),
@@ -39,17 +39,28 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  OS Reserved: ", theme::dim_style()),
-            Span::styled("3.5G", theme::text_style()),
-        ]),
-        Line::from(vec![
-            Span::styled("  Available: ", theme::dim_style()),
-            Span::styled(
-                format!("{:.1}G", mem.available_gb()),
-                theme::safe_style(),
-            ),
+            Span::styled("  OS + Apps:    ", theme::dim_style()),
+            Span::styled(format!("{:>5.1}G", mem.used_gb()), theme::text_style()),
         ]),
     ];
+
+    // Show top 3 memory-consuming processes the user can close
+    for proc in mem.top_processes.iter().take(3) {
+        let name: String = proc.name.chars().take(11).collect();
+        lines.push(Line::from(vec![
+            Span::styled("    › ", theme::dim_style()),
+            Span::styled(format!("{:<11} ", name), theme::text_style()),
+            Span::styled(format!("{:>5.1}G", proc.memory_gb()), theme::highlight_style()),
+        ]));
+    }
+
+    lines.push(Line::from(vec![
+        Span::styled("  Available:    ", theme::dim_style()),
+        Span::styled(
+            format!("{:>5.1}G", mem.available_gb()),
+            theme::safe_style(),
+        ),
+    ]));
 
     let panel = Paragraph::new(lines).block(
         Block::default()

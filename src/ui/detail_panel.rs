@@ -44,7 +44,8 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     };
 
     // Available RAM for models (total - OS reserved)
-    let avail_gb = (total_ram as f64 / (1024.0 * 1024.0 * 1024.0)) - 3.5;
+    let os_used_gb = app.hardware.memory.used_gb();
+    let avail_gb = (total_ram as f64 / (1024.0 * 1024.0 * 1024.0)) - os_used_gb.max(2.5);
 
     // Horizon limit display
     let horizon = if analysis.max_safe_context > 1024 {
