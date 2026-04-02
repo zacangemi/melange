@@ -13,7 +13,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let line = Line::from(vec![
         Span::styled(format!(" \"{}\"", quote), theme::dim_style()),
         Span::styled(
-            "                    [q]uit [j/k]navigate [r]efresh",
+            "                    [q]uit [j/k]navigate [r]efresh [v]pn [Tab]view",
             theme::dim_style(),
         ),
     ]);

@@ -1,0 +1,176 @@
+# Melange Compatibility Knowledge Base
+# Each [[warnings]] entry documents a known engine-model issue.
+# Severity: "info" (FYI), "caution" (works with caveats), "breaking" (does not work / major bugs)
+# Match criteria: model_type, architecture, model_family (name prefix), is_moe — AND logic.
+
+# ─── llama.cpp ─────────────────────────────────────────────────────
+
+[[warnings]]
+id = "llamacpp-qwen3-context-reprocessing"
+model_family = "qwen3"
+engine = "llama.cpp"
+severity = "caution"
+summary = "Qwen3 has known context reprocessing bugs in llama.cpp"
+detail = "Context shifting may produce degraded output at longer contexts. Confirmed through mid-2025 builds."
+
+[[warnings]]
+id = "llamacpp-glm47-lite-gating"
+model_type = "glm4"
+model_family = "glm-4"
+is_moe = true
+engine = "llama.cpp"
+severity = "caution"
+summary = "GLM-4.7 Lite MoE uses sigmoid gating, not softmax — older builds produce bad output"
+detail = "Fixed in llama.cpp PR #18980 (Jan 2026). Older GGUF files may have wrong gating metadata. Use --override-kv deepseek2.expert_gating_func=int:2 as workaround."
+
+[[warnings]]
+id = "llamacpp-glm47-flash-cuda-logits"
+model_family = "glm-4.7-flash"
+engine = "llama.cpp"
+severity = "caution"
+summary = "GLM-4.7-Flash may produce static logit distribution on CUDA"
+detail = "Same output tokens regardless of input on CUDA, while CPU inference returns correct results. Affects some GGUF quantizations."
+
+[[warnings]]
+id = "llamacpp-glm47-flash-slow"
+model_family = "glm-4.7-flash"
+engine = "llama.cpp"
+severity = "info"
+summary = "GLM-4.7-Flash inference is slower than other A3B MoE models in llama.cpp"
+detail = "Users report significantly slower tok/s compared to similar-sized A3B architectures like Qwen3-30B-A3B."
+
+[[warnings]]
+id = "llamacpp-deepseek-mla-context"
+model_family = "deepseek"
+engine = "llama.cpp"
+severity = "caution"
+summary = "DeepSeek V3/R1 MLA can produce gibberish above 2K tokens with some quants"
+detail = "Context degradation with dynamic quantizations (Unsloth UD). Short prompts work fine. Related to MLA implementation in llama.cpp."
+
+[[warnings]]
+id = "llamacpp-deepseek-cpu-bound"
+model_family = "deepseek"
+engine = "llama.cpp"
+severity = "info"
+summary = "DeepSeek R1 GGUF inference can become CPU-bound despite GPU offload"
+detail = "GPU utilization may stay at 0-5% while CPU hits 3000%. Occurs with large quantized variants. Check -ngl settings."
+
+[[warnings]]
+id = "llamacpp-sentencepiece-tokenizer"
+engine = "llama.cpp"
+model_family = "llama"
+severity = "info"
+summary = "llama.cpp SentencePiece tokenizer may differ from HuggingFace tokenizer output"
+detail = "Token sequences can differ from HF transformers and official SentencePiece. May affect exact reproducibility."
+
+[[warnings]]
+id = "llamacpp-qwen35-hybrid-reprocessing"
+model_family = "qwen3.5"
+engine = "llama.cpp"
+severity = "breaking"
+summary = "Qwen3.5 hybrid (Mamba+attention) forces full prompt reprocessing every turn"
+detail = "Multi-turn conversations reprocess the entire prompt on every turn. A 15K-token conversation takes ~8 minutes per turn. Recurrent memory cannot be partially truncated. Affects all hybrid attention+Mamba models."
+
+# ─── ExLlamaV2 ─────────────────────────────────────────────────────
+
+[[warnings]]
+id = "exllamav2-deepseek-unsupported"
+model_family = "deepseek"
+engine = "ExLlamaV2"
+severity = "breaking"
+summary = "ExLlamaV2 does not support DeepSeek V2/V3 MLA architecture"
+detail = "DeepSeek's shared experts and MLA attention are not implemented. Model falls back to LlamaForCausalLM incorrectly. Maintainer cites time constraints."
+
+[[warnings]]
+id = "exllamav2-qwen3-template"
+model_family = "qwen3"
+engine = "ExLlamaV2"
+severity = "caution"
+summary = "Qwen3 support is dev-branch only with template generation issues"
+detail = "Non-MoE Qwen3 added to dev branch. Larger models (32B) may produce gibberish due to template issues. 14B works better."
+
+[[warnings]]
+id = "exllamav2-nvidia-only"
+engine = "ExLlamaV2"
+architecture = "any"
+severity = "info"
+summary = "ExLlamaV2 requires NVIDIA CUDA GPUs — not available on Apple Silicon"
+detail = "ExLlamaV2 is optimized for NVIDIA consumer GPUs. It will not run on Apple Silicon Metal."
+
+# ─── MLX ───────────────────────────────────────────────────────────
+
+[[warnings]]
+id = "mlx-mamba-hybrid-cache"
+engine = "MLX"
+model_type = "qwen3_moe"
+severity = "caution"
+summary = "Mamba/SSM hybrid models have broken prefix caching in MLX"
+detail = "Qwen3.5, GPT-OSS, Gemma 3, Llama 4 models using sliding window or Mamba layers cannot trim prompt cache. Concurrent requests fall back to full recomputation."
+
+[[warnings]]
+id = "mlx-bfloat16-bug"
+engine = "MLX"
+architecture = "any"
+severity = "info"
+summary = "bfloat16 LoRA training was broken in MLX 0.26.x — fixed in 0.27.0"
+detail = "RuntimeError on s2n_copy kernel for bfloat16. Only affects training/fine-tuning, not inference."
+
+# ─── vLLM ──────────────────────────────────────────────────────────
+
+[[warnings]]
+id = "vllm-apple-silicon-no-gpu"
+engine = "vLLM"
+architecture = "any"
+severity = "caution"
+summary = "vLLM has no GPU acceleration on Apple Silicon — CPU-only or experimental Metal"
+detail = "CUDA is unavailable on macOS. vLLM-Metal plugin exists for experimental Apple Silicon support via MLX backend, but is community-maintained."
+
+[[warnings]]
+id = "vllm-deepseek-mla-perf"
+model_family = "deepseek"
+engine = "vLLM"
+severity = "info"
+summary = "DeepSeek MLA performance was degraded in vLLM v0.7.x"
+detail = "MQA implementation in v0.7.1 had lower performance than MHA in v0.6.6. Improved in later versions."
+
+# ─── Ollama ────────────────────────────────────────────────────────
+
+[[warnings]]
+id = "ollama-flash-attention-silent-fallback"
+engine = "Ollama"
+architecture = "any"
+severity = "info"
+summary = "Ollama silently falls back to f16 KV cache if Flash Attention is unsupported"
+detail = "Setting OLLAMA_KV_CACHE_TYPE=q8_0 on architectures without FA support (e.g., command-r, standard llama3) silently uses f16. Check server logs to verify."
+
+[[warnings]]
+id = "ollama-version-architecture"
+engine = "Ollama"
+model_family = "gemma"
+severity = "caution"
+summary = "Gemma 3 requires recent Ollama version — older versions report 'unknown architecture'"
+detail = "Ollama versions before the Gemma 3 support update will error with 'unknown model architecture: gemma3'. Update Ollama to latest."
+
+[[warnings]]
+id = "ollama-gemma3-27b-crash"
+engine = "Ollama"
+model_family = "gemma"
+severity = "caution"
+summary = "Gemma 3 27B may stop responding or crash under GPU load in Ollama"
+detail = "Model stops after a few interactions with no error. Running without GPU works. Appears related to GPU memory management. Partially addressed in later Ollama releases."
+
+[[warnings]]
+id = "ollama-context-512k-crash"
+engine = "Ollama"
+architecture = "any"
+severity = "info"
+summary = "Context sizes above 512K tokens break Flash Attention in Ollama"
+detail = "Configuring context > 524,288 tokens with FA and KV quantization causes crash. Ollama falls back to non-FA mode which also fails."
+
+[[warnings]]
+id = "mlx-server-kv-unbounded-all"
+engine = "MLX"
+architecture = "any"
+severity = "caution"
+summary = "mlx_lm.server has no KV cache size limit — long sessions risk kernel panic"
+detail = "mlx_lm.server does not support --max-kv-size. At ~58K+ tokens the KV cache can exceed Metal's max buffer, causing IOGPUMemory crash and full macOS kernel panic."

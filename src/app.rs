@@ -12,8 +12,15 @@ pub enum AppState {
     Dashboard,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DashboardTab {
+    Local,
+    Catalog,
+}
+
 pub struct App {
     pub state: AppState,
+    pub active_tab: DashboardTab,
     pub hardware: HardwareInfo,
     pub models: Vec<ModelInfo>,
     pub analyses: Vec<ModelAnalysis>,
@@ -23,6 +30,9 @@ pub struct App {
     pub splash_start: Instant,
     pub last_quote_change: Instant,
     pub should_quit: bool,
+    pub vpn_visible: bool,
+    pub compat_db: crate::compat::warnings::CompatDb,
+    pub warnings: Vec<Vec<crate::compat::warnings::CompatWarning>>,
 }
 
 impl App {
@@ -32,10 +42,22 @@ impl App {
             .map(|m| memory_calc::analyze(m, hardware.memory.total_bytes, hardware.bandwidth_gbs))
             .collect();
 
+        let compat_db = crate::compat::warnings::load_compat_db();
+        let warnings: Vec<Vec<crate::compat::warnings::CompatWarning>> = models
+            .iter()
+            .map(|m| {
+                crate::compat::warnings::find_warnings(&compat_db, m, &hardware.engines)
+                    .into_iter()
+                    .cloned()
+                    .collect()
+            })
+            .collect();
+
         let now = Instant::now();
 
         App {
             state: AppState::Splash,
+            active_tab: DashboardTab::Local,
             hardware,
             models,
             analyses,
@@ -45,6 +67,9 @@ impl App {
             splash_start: now,
             last_quote_change: now,
             should_quit: false,
+            vpn_visible: false,
+            compat_db,
+            warnings,
         }
     }
 
@@ -82,8 +107,17 @@ impl App {
                     };
                 }
             }
+            KeyCode::Tab => {
+                self.active_tab = match self.active_tab {
+                    DashboardTab::Local => DashboardTab::Catalog,
+                    DashboardTab::Catalog => DashboardTab::Local,
+                };
+            }
             KeyCode::Char('r') => {
                 self.refresh();
+            }
+            KeyCode::Char('v') => {
+                self.vpn_visible = !self.vpn_visible;
             }
             _ => {}
         }
@@ -100,6 +134,17 @@ impl App {
             .iter()
             .map(|m| {
                 memory_calc::analyze(m, self.hardware.memory.total_bytes, self.hardware.bandwidth_gbs)
+            })
+            .collect();
+        // Recompute compatibility warnings
+        self.compat_db = crate::compat::warnings::load_compat_db();
+        self.warnings = models
+            .iter()
+            .map(|m| {
+                crate::compat::warnings::find_warnings(&self.compat_db, m, &self.hardware.engines)
+                    .into_iter()
+                    .cloned()
+                    .collect()
             })
             .collect();
         self.models = models;

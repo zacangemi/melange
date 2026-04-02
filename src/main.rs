@@ -1,4 +1,5 @@
 mod app;
+mod compat;
 mod config;
 mod hardware;
 mod models;

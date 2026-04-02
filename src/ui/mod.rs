@@ -6,11 +6,12 @@ pub mod models_panel;
 pub mod detail_panel;
 pub mod footer;
 pub mod splash;
+pub mod catalog_panel;
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
-use crate::app::App;
+use crate::app::{App, DashboardTab};
 
 pub fn draw(f: &mut Frame, app: &App) {
     let size = f.area();
@@ -25,17 +26,22 @@ pub fn draw(f: &mut Frame, app: &App) {
         ])
         .split(size);
 
-    header::draw(f, chunks[0]);
-    draw_body(f, app, chunks[1]);
+    header::draw(f, &app.active_tab, chunks[0]);
+
+    match app.active_tab {
+        DashboardTab::Local => draw_local_body(f, app, chunks[1]),
+        DashboardTab::Catalog => catalog_panel::draw(f, app, chunks[1]),
+    }
+
     footer::draw(f, app, chunks[2]);
 }
 
-fn draw_body(f: &mut Frame, app: &App, area: Rect) {
+fn draw_local_body(f: &mut Frame, app: &App, area: Rect) {
     // Body: top section (hardware+memory) and bottom section (models+detail)
     let body = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(9),   // Hardware + Memory row
+            Constraint::Length(12),  // Hardware + Memory row
             Constraint::Min(6),      // Models table + detail
         ])
         .split(area);

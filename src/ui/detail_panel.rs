@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 
 use super::theme;
 use crate::app::App;
+use crate::compat::warnings::WarningSeverity;
 use crate::models::memory_calc::FitStatus;
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
@@ -119,17 +120,17 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
         let delta = if i > 0 {
             let prev_kv = analysis.estimates[i - 1].kv_cache_gb();
-            format!(" +{:.1}G ", est.kv_cache_gb() - prev_kv)
+            format!("{:>+7.2}G", est.kv_cache_gb() - prev_kv)
         } else {
-            "       ".to_string()
+            "        ".to_string()
         };
 
         lines.push(Line::from(vec![
             Span::styled(format!("    {:>6} ctx ", ctx_label), theme::dim_style()),
             Span::styled(format!("KV: {:>6.1} GB", est.kv_cache_gb()), theme::text_style()),
-            Span::styled(delta, theme::dim_style()),
-            Span::styled("│  ", theme::dim_style()),
-            Span::styled(format!("Total: {:>5.1} GB", est_total), theme::text_style()),
+            Span::styled(format!(" {} ", delta), theme::dim_style()),
+            Span::styled("│ ", theme::dim_style()),
+            Span::styled(format!("Total: {:>6.1} GB", est_total), theme::text_style()),
             Span::styled(indicator, ind_style),
         ]));
     }
@@ -166,6 +167,29 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled(analysis.status.label(), status_style),
     ]));
+
+    // Engine warnings (from compat KB)
+    let warnings = &app.warnings[app.selected_model];
+    if !warnings.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("  Engine Warnings:", theme::title_style()),
+        ]));
+
+        for w in warnings {
+            let severity_style = match w.severity {
+                WarningSeverity::Info => theme::dim_style(),
+                WarningSeverity::Caution => theme::highlight_style(),
+                WarningSeverity::Breaking => theme::danger_style(),
+            };
+
+            lines.push(Line::from(vec![
+                Span::styled(format!("    {} ", w.severity.icon()), severity_style),
+                Span::styled(format!("[{}] ", w.engine), theme::dim_style()),
+                Span::styled(&w.summary, severity_style),
+            ]));
+        }
+    }
 
     let title = format!(" ▸ {}  ", model.name);
     let panel = Paragraph::new(lines).block(

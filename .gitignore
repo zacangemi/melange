@@ -1,1 +1,13 @@
 /target
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.vscode/
+.idea/
