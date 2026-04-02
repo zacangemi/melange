@@ -197,4 +197,4 @@ You can add your own warnings or override built-in ones by creating `~/.config/m
 
 ## License
 
-MIT
+Apache 2.0 — see [LICENSE](LICENSE) for details.
