@@ -166,22 +166,17 @@ if [ "$FOUND_RC" -eq 0 ]; then
     echo "    $PATH_LINE"
 fi
 
+# Make melange available immediately in this shell
+export PATH="$HOME/.melange/bin:$PATH"
+
 echo ""
 echo "============================================"
 echo "  Installed successfully!"
 echo "============================================"
 echo ""
-echo "  IMPORTANT: You must open a NEW terminal"
-echo "  window before running melange."
-echo ""
-echo "  Or run this in your current terminal:"
-echo ""
-echo "    source ~/.zshrc"
-echo ""
-echo "  Then:"
+echo "  Run it now:"
 echo ""
 echo "    melange              # Launch the TUI dashboard"
 echo "    melange config       # Configure model directory"
-echo "    melange --scan PATH  # Scan a specific directory"
 echo ""
 echo "The spice must flow."
