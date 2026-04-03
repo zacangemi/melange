@@ -60,7 +60,7 @@ mkdir -p "$INSTALL_DIR"
 # --- Try pre-built binary, fall back to source ---
 
 echo "Fetching latest release..."
-DOWNLOAD_URL=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"browser_download_url"' | grep 'melange-macos-arm64' | head -1 | cut -d '"' -f 4 || true)
+DOWNLOAD_URL=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"browser_download_url"' | grep 'aarch64-apple-darwin' | head -1 | cut -d '"' -f 4 || true)
 
 if [ -z "$DOWNLOAD_URL" ]; then
     echo "No pre-built binary found. Building from source..."
@@ -91,13 +91,14 @@ if [ -z "$DOWNLOAD_URL" ]; then
 else
     # Download pre-built binary
     echo "Downloading pre-built binary..."
-    TMPFILE=$(mktemp)
-    curl -sSL "$DOWNLOAD_URL" -o "$TMPFILE"
-    chmod +x "$TMPFILE"
+    TMPDIR=$(mktemp -d)
+    curl -sSL "$DOWNLOAD_URL" -o "$TMPDIR/melange.tar.gz"
+    tar -xzf "$TMPDIR/melange.tar.gz" -C "$TMPDIR"
 
     echo "Installing to ${INSTALL_DIR}..."
-    mv "$TMPFILE" "${INSTALL_DIR}/${BINARY}"
+    mv "$TMPDIR/${BINARY}" "${INSTALL_DIR}/${BINARY}"
     chmod +x "${INSTALL_DIR}/${BINARY}"
+    rm -rf "$TMPDIR"
 fi
 
 # --- Update PATH in shell rc file ---
