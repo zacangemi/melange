@@ -54,7 +54,7 @@ No Ollama. No APIs. No cloud. Pure local analysis.
 ### One-liner (macOS Apple Silicon)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/zacangemi/melange/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/zacangemi/melange/master/install.sh | sh
 ```
 
 This installs to `~/.melange/bin/` and updates your shell PATH. No sudo required.
