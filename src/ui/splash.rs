@@ -5,31 +5,53 @@ use ratatui::text::{Line, Span};
 
 use super::theme;
 
-// Arrakeen mansion mural — Shai-Hulud
-// Circular mouth with radiating lines on left, thick segmented S-curve body,
-// body loops upward with spiral curl, tiny Fremen figures along the bottom dunes.
+// Shai-Hulud's maw — head-on, rising from the sands of Arrakis.
+// Inspired by the Dune (2021) sandworm emergence scene.
+// Radial teeth converge to dark throat center, thick body ring,
+// sand dunes flank the base, two tiny Fremen figures stand below.
 const WORM_BODY: &[&str] = &[
-    r"                          .  '  .                                                       ",
-    r"            \  ' .  /    ' .  . '   .  '                                        ___     ",
-    r"         --  \  |  / --      '                                                 / _ \    ",
-    r"        '  ---\\|//---  .        .                                             | / \ |   ",
-    r"          -====(●)====-                        .          .                    |  _  |   ",
-    r"        .  ---/|\\---  '     .          ___---~~~~---___                        \ \_/ |  ",
-    r"         --  /  |  \ --          ___--~~  //||||\\\\  ~~--___                    \___/   ",
-    r"            /  ' .  \     ___--~~   ////  ||||||||  \\\\   ~~--___                 |    ",
-    r"          '    .    ___--~~ //////  ||||  ||||||||  ||||  \\\\\\ ~~--___          /     ",
-    r"           ___..--~~ //// ||||||||  ||||   ||||||   ||||  |||||||| \\\\ ~~--..__/      ",
-    r"     __--~~  //////  |||| ||||||||  ||||    ||||    ||||  |||||||| ||||  \\\\\\  ~~--   ",
-    r"   ~~  ////  ||||||  |||| ||||||||  ||||    ||||    ||||  |||||||| ||||  ||||||  \\\\   ",
-    r"    \\\\  ||||  ||||  ||||  ||||||  ||||    ||||    ||||  ||||||  ||||  ||||  ////      ",
-    r"      \\\\  ||||  ||||  \\\\  ||||  ||||    ||||    ||||  ||||  ////  ||||  ////        ",
-    r"  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-    r"  ~~.~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~  ~~   ",
-    r"      .  i i .    i i .    i i .    i i      i i .    i i .    i i .    i i .             ",
+    r"~~~~.~~~~  ~~~~.~~~~  ~~~~                                     ~~~~  ~~~~.~~~~  ~~~~.~~~~",
+    r"     ~~~~.~~~~  ~~~~                                                 ~~~~  ~~~~.~~~~",
+    r"          ~~~~                                                             ~~~~",
+    r"               ~~~~                @@@@@@@@@@@@@@                ~~~~",
+    r"                              @@@@@@@@@@@@@@@@@@@@@@@@",
+    r"                           @@@@@@@ \ \ \ \ | / / / / @@@@@@@",
+    r"                         @@@@@@ \ \ \ \ \ \ | / / / / / / @@@@@@",
+    r"                       @@@@@ \ \ \ \ \ \ \ \ | / / / / / / / / @@@@@",
+    r"                      @@@@ \ \ \ \ \ \ \ \ \ | / / / / / / / / / @@@@",
+    r"                     @@@@ \ \ \ \ \ \ \ \ \\ | // / / / / / / / / @@@@",
+    r"                    @@@@ - \ \ \ \ \ \ \\\\ | //// / / / / / / - @@@@",
+    r"                   @@@@ - - \ \ \ \ \\\\\\  |  ////// / / / / - - @@@@",
+    r"                   @@@@ - - - \ \ \\\\\\\\     //////// / / - - - @@@@",
+    r"                  @@@@ - - - - \ \\\\\\\\\\  .  ////////// / - - - - @@@@",
+    r"                  @@@@ - - - - - \\\\\\\\\\  .  ////////// - - - - - @@@@",
+    r"                  @@@@ - - - - - - - \\\\\  . .  ///// - - - - - - - @@@@",
+    r"                  @@@@ - - - - - - - - - -  . .  - - - - - - - - - - @@@@",
+    r"                  @@@@ - - - - - - - /////  . .  \\\\\ - - - - - - - @@@@",
+    r"                  @@@@ - - - - - //////////  .  \\\\\\\\\\ - - - - - @@@@",
+    r"                  @@@@ - - - - / //////////  .  \\\\\\\\\\ \ - - - - @@@@",
+    r"                   @@@@ - - - / / ////////     \\\\\\\\ \ \ - - - @@@@",
+    r"  ~~                @@@@ - - / / / / //////  |  \\\\\\ \ \ \ \ - - @@@@                ~~",
+    r"  ~~~~               @@@@ - / / / / / / //// | \\\\ \ \ \ \ \ \ - @@@@               ~~~~",
+    r"  ~~~~.~~              @@@@ / / / / / / / / // | \\ \ \ \ \ \ \ \ \ @@@@              ~~.~~~~",
+    r"  ~~~~.~~~~              @@@@ / / / / / / / / / | \ \ \ \ \ \ \ \ \ @@@@              ~~~~.~~~~",
+    r"  ~~~~.~~~~  ~~            @@@@@ / / / / / / / / | \ \ \ \ \ \ \ \ @@@@@            ~~  ~~~~.~~~~",
+    r"  ~~~~.~~~~  ~~~~.~~          @@@@@@ / / / / / / | \ \ \ \ \ \ @@@@@@          ~~.~~~~  ~~~~.~~~~",
+    r"  ~~~~.~~~~  ~~~~.~~~~  ~~       @@@@@@@@@@@@@@@@@@@@@@@@@@@@@       ~~  ~~~~.~~~~  ~~~~.~~~~",
+    r"  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~   @@@@@@@@@@@@@@@@@@@@@   ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~",
+    r"  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~",
+    r"  ~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~~~.~~~~  ~~",
+    r"      .  i i .    i i .    i i .    i i      i i .    i i .    i i .    i i .    i i .",
+    r"",
+    r"                                   o         o",
+    r"                                  /|\       /|\",
+    r"                                  / \       / \",
 ];
 
-// Lines that are sand/dunes (rendered in DEEP_DESERT)
-const DUNE_START: usize = 14;
+// Coloring zones
+const WORM_START: usize = 4;   // Worm body begins (SPICE_ORANGE)
+const SAND_START: usize = 29;  // Flat sand begins (DEEP_DESERT)
+const FREMEN_START: usize = 33; // Fremen figures (FREMEN_BLUE)
 
 pub fn draw(f: &mut Frame) {
     let area = f.area();
@@ -49,12 +71,20 @@ pub fn draw(f: &mut Frame) {
     let h_pad = (area.width as usize).saturating_sub(max_art_width) / 2;
     let pad_str = " ".repeat(h_pad);
 
-    // Render with dual coloring: worm in SPICE_ORANGE, dunes in DEEP_DESERT
+    // Four-zone coloring:
+    //   Background dunes (0..WORM_START)     → DEEP_DESERT
+    //   Worm body+teeth  (WORM_START..SAND)  → SPICE_ORANGE
+    //   Flat sand         (SAND..FREMEN)      → DEEP_DESERT
+    //   Fremen figures    (FREMEN..)          → FREMEN_BLUE
     for (i, line) in WORM_BODY.iter().enumerate() {
-        let style = if i >= DUNE_START {
+        let style = if i >= FREMEN_START {
+            theme::safe_style()
+        } else if i >= SAND_START {
             theme::dim_style()
-        } else {
+        } else if i >= WORM_START {
             theme::highlight_style()
+        } else {
+            theme::dim_style()
         };
         lines.push(Line::from(Span::styled(
             format!("{}{}", pad_str, line),
