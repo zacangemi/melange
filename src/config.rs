@@ -223,6 +223,21 @@ pub fn run_dirs_command() -> Result<()> {
             println!("  {}. {}{}", i + 1, dir, status);
         }
     }
+
+    // Show Ollama auto-detection status
+    println!();
+    if let Some(ollama_dir) = crate::models::ollama::ollama_models_dir() {
+        let count = crate::models::ollama::scan_ollama_models().len();
+        if count > 0 {
+            println!("  Ollama: auto-detected ({} model{} from {})",
+                count, if count == 1 { "" } else { "s" }, ollama_dir.display());
+        } else {
+            println!("  Ollama: found at {} (no models installed)", ollama_dir.display());
+        }
+    } else {
+        println!("  Ollama: not detected");
+    }
+
     println!();
     Ok(())
 }
