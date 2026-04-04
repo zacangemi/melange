@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use crossterm::{
     event::{self, Event, KeyEventKind},
     execute,
@@ -66,6 +66,7 @@ enum Commands {
     /// Add a model directory
     Add {
         /// Path to the model directory
+        #[arg(value_hint = clap::ValueHint::DirPath)]
         path: String,
     },
     /// List registered model directories
@@ -73,12 +74,18 @@ enum Commands {
     /// Remove a model directory
     Remove {
         /// Path to remove
+        #[arg(value_hint = clap::ValueHint::DirPath)]
         path: String,
     },
     /// Show configuration
     Config,
     /// Check for updates and self-update to the latest release
     Update,
+    /// Generate shell completions (bash, zsh, fish)
+    Completions {
+        /// Shell to generate completions for
+        shell: clap_complete::Shell,
+    },
 }
 
 #[derive(Serialize)]
@@ -130,6 +137,10 @@ fn main() -> Result<()> {
         Some(Commands::Remove { path }) => return config::run_remove_command(&path),
         Some(Commands::Config) => return config::run_config_command(),
         Some(Commands::Update) => return update::run_update_command(),
+        Some(Commands::Completions { shell }) => {
+            clap_complete::generate(shell, &mut Cli::command(), "melange", &mut io::stdout());
+            return Ok(());
+        }
         None => {}
     }
 

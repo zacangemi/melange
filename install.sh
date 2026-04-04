@@ -169,6 +169,21 @@ fi
 # Make melange available immediately in this shell
 export PATH="$HOME/.melange/bin:$PATH"
 
+# --- Install shell completions ---
+
+mkdir -p "$HOME/.melange/completions"
+"${INSTALL_DIR}/${BINARY}" completions zsh > "$HOME/.melange/completions/_melange" 2>/dev/null || true
+
+# Add completions to fpath in zshrc
+FPATH_LINE='fpath=(~/.melange/completions $fpath)'
+if [ -f "$HOME/.zshrc" ]; then
+    if ! grep -qF '.melange/completions' "$HOME/.zshrc"; then
+        echo "$FPATH_LINE" >> "$HOME/.zshrc"
+        echo "autoload -Uz compinit && compinit" >> "$HOME/.zshrc"
+        echo "  Shell completions installed (restart your shell to activate)"
+    fi
+fi
+
 echo ""
 echo "============================================"
 echo "  Installed successfully!"
