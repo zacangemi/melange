@@ -47,7 +47,7 @@ Melange scans your hardware, reads your model metadata, does the math, and shows
 - KV cache growth at every context size (with per-step memory deltas)
 - Known engine bugs for your specific models
 
-No Ollama. No APIs. No cloud. Pure local analysis.
+No APIs. No cloud. Pure local analysis.
 
 ## Install
 
@@ -57,7 +57,7 @@ No Ollama. No APIs. No cloud. Pure local analysis.
 curl -sSL https://raw.githubusercontent.com/zacangemi/melange/master/install.sh | sh
 ```
 
-This installs to `~/.melange/bin/` and updates your shell PATH. No sudo required.
+This installs to `~/.melange/bin/`, updates your shell PATH, and sets up tab-completions for zsh. No sudo required.
 
 ### Build from Source
 
@@ -94,6 +94,8 @@ The first time you run `melange`, it will ask where your models live:
 
 If `~/AI_MODELS/models/` already exists, Melange detects it automatically and skips the prompt.
 
+Ollama models are auto-detected from `~/.ollama/models/` — no setup needed. If you have Ollama installed, your models will appear in the Local tab automatically alongside any safetensors models.
+
 ## Usage
 
 ```bash
@@ -102,6 +104,8 @@ melange add ~/more/models    # Register another model directory
 melange dirs                 # List all registered directories
 melange remove ~/old/path    # Unregister a directory
 melange config               # Show configuration
+melange update               # Self-update to the latest release
+melange completions zsh      # Generate shell completions
 melange --scan /one-off      # Override for this run (not saved)
 melange --json               # Output as JSON (for scripting)
 ```
@@ -170,9 +174,9 @@ Model directory resolution order:
 - Installed inference engines (llama.cpp, MLX, Ollama, vLLM, ExLlamaV2)
 - VPN status (Tailscale)
 
-**Models** (reads JSON metadata only — never touches weight files):
-- `config.json` — architecture, layers, attention heads, MoE experts, quantization
-- `model.safetensors.index.json` — exact parameter count and byte size
+**Models** (reads metadata only — never touches weight data):
+- **Safetensors** — `config.json` + `model.safetensors.index.json` (architecture, params, quantization)
+- **Ollama/GGUF** — Auto-detected from `~/.ollama/models/`. Reads GGUF binary headers (first few KB only) to extract architecture metadata. Works whether Ollama is running or not.
 
 Non-model files in your directories are ignored. Melange only picks up subdirectories containing valid model metadata.
 
@@ -204,10 +208,18 @@ Each warning includes:
 
 You can add your own warnings or override built-in ones by creating `~/.config/melange/compat_warnings.toml`.
 
+## Updating
+
+```bash
+melange update
+```
+
+Checks GitHub Releases for a newer version, downloads the binary, and replaces itself. One command, no reinstall needed.
+
 ## Requirements
 
 - macOS with Apple Silicon (M1/M2/M3/M4)
-- Model files in safetensors format with `config.json`
+- Model files in safetensors format with `config.json`, and/or Ollama installed
 
 ## License
 
