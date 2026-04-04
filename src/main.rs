@@ -5,6 +5,7 @@ mod hardware;
 mod models;
 mod ui;
 mod dune;
+mod update;
 
 use std::io;
 use std::path::PathBuf;
@@ -29,7 +30,7 @@ use models::memory_calc;
 /// A Dune-themed terminal tool that scans your hardware and local model files
 /// to tell you exactly what fits, how fast it'll run, and when you'll hit swap.
 #[derive(Parser, Debug)]
-#[command(name = "melange", version = "0.1.0")]
+#[command(name = "melange", version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "The memory must flow — local model memory analyzer for Apple Silicon")]
 #[command(after_help = "\
 KEYBINDINGS (TUI):
@@ -76,6 +77,8 @@ enum Commands {
     },
     /// Show configuration
     Config,
+    /// Check for updates and self-update to the latest release
+    Update,
 }
 
 #[derive(Serialize)]
@@ -126,6 +129,7 @@ fn main() -> Result<()> {
         Some(Commands::Dirs) => return config::run_dirs_command(),
         Some(Commands::Remove { path }) => return config::run_remove_command(&path),
         Some(Commands::Config) => return config::run_config_command(),
+        Some(Commands::Update) => return update::run_update_command(),
         None => {}
     }
 
@@ -139,7 +143,7 @@ fn main() -> Result<()> {
     let hardware = HardwareInfo::detect(vpn_pref)?;
 
     // Scan all model directories
-    let found_models = models::scanner::scan_directories(&model_dirs);
+    let found_models = models::scanner::scan_all_models(&model_dirs);
 
     if cli.json {
         return output_json(&hardware, &found_models);

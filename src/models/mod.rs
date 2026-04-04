@@ -3,6 +3,8 @@ pub mod config_parser;
 pub mod index_parser;
 pub mod memory_calc;
 pub mod catalog;
+pub mod gguf_parser;
+pub mod ollama;
 
 use serde::Serialize;
 

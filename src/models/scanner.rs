@@ -5,6 +5,13 @@ use super::ModelInfo;
 use super::config_parser;
 use super::index_parser;
 
+/// Scan safetensors directories and Ollama models, merged into one list.
+pub fn scan_all_models(dirs: &[PathBuf]) -> Vec<ModelInfo> {
+    let mut models = scan_directories(dirs);
+    models.extend(super::ollama::scan_ollama_models());
+    models
+}
+
 /// Scan multiple directories and merge results.
 pub fn scan_directories(dirs: &[PathBuf]) -> Vec<ModelInfo> {
     let mut all_models = Vec::new();

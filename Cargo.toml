@@ -16,3 +16,7 @@ clap = { version = "4", features = ["derive"] }
 bytesize = "1"
 dirs = "5"
 toml = "0.8"
+ureq = "3"
+self-replace = "1"
+flate2 = "1"
+tar = "0.4"

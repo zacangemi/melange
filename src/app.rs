@@ -237,7 +237,7 @@ impl App {
             self.hardware = hw;
         }
         // Re-scan all model directories
-        let models = crate::models::scanner::scan_directories(&self.model_dirs);
+        let models = crate::models::scanner::scan_all_models(&self.model_dirs);
         self.analyses = models
             .iter()
             .map(|m| {
