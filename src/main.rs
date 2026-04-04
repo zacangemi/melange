@@ -33,28 +33,29 @@ use models::memory_calc;
 #[command(name = "melange", version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "The memory must flow — local model memory analyzer for Apple Silicon")]
 #[command(after_help = "\
-KEYBINDINGS (TUI):
-  q / Esc      Quit
-  j / k        Navigate models (down / up)
-  Tab          Switch between Local and Catalog views
-  r            Refresh hardware detection and model scan
-  v            Toggle VPN IP visibility (masked ↔ revealed)
-  ?            Show keybinding help overlay
+Keybindings (TUI):
+  q / Esc       Quit
+  j / k         Navigate models (down / up)
+  Tab           Switch between Local and Catalog views
+  r             Refresh hardware + model scan
+  v             Toggle VPN IP visibility
+  w             Show compatibility warnings
+  ?             Show keybinding help overlay
 
-CONFIGURATION:
+Configuration:
   ~/.config/melange/config.toml
 
   model_dirs = [\"/path/to/models\"]
-  vpn = \"tailscale\"              # optional: lock VPN detection to a provider
-                                  # auto-detects if omitted (tailscale → zerotier → nebula → wireguard)
+  vpn = \"tailscale\"    Lock VPN detection to a provider
+                        (auto-detects if omitted)
 ")]
 struct Cli {
-    /// Scan a specific directory (one-time override, not saved)
-    #[arg(long = "scan", value_name = "PATH")]
+    /// Scan a specific directory (not saved)
+    #[arg(short, long, value_name = "PATH")]
     scan: Option<PathBuf>,
 
     /// Output as JSON instead of launching TUI
-    #[arg(long)]
+    #[arg(short, long)]
     json: bool,
 
     #[command(subcommand)]
