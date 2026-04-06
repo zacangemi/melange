@@ -1,6 +1,6 @@
 [package]
 name = "melange"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "The Memory Must Flow — Dune-themed local model memory analyzer for Apple Silicon"
 license = "Apache-2.0"

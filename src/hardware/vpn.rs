@@ -16,10 +16,9 @@ impl VpnInfo {
 
         match &self.ip {
             Some(ip) if visible => format!("{}  {}", self.name, ip),
-            Some(ip) => {
-                // Mask last 3 octets: "100.64.1.23" -> "100.••.••.••"
-                let first_octet = ip.split('.').next().unwrap_or("•••");
-                format!("{}  {}.••.••.••", self.name, first_octet)
+            Some(_) => {
+                // Fully mask IP: "100.64.1.23" -> "••.••.••.••"
+                format!("{}  ••.••.••.••", self.name)
             }
             None => self.name.clone(),
         }
